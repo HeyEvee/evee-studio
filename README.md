@@ -16,7 +16,7 @@ Private beta: invite-only, free.
 | Piece | What it does |
 | --- | --- |
 | Next.js 14 on Vercel | The app, login and API |
-| Supabase Auth | Email + 6-digit code sign-in, invite-only |
+| Supabase Auth | Email + one-time code sign-in, invite-only |
 | Supabase Postgres | `docs` (each tester's private data), `virals` (the shared feed), `ai_calls` (daily limits) |
 | Supabase Storage (`virals` bucket) | Dropped videos (deleted after Evee watches them) and their cover frames |
 | Google Gemini (`lib/gemini.ts`) | Watches **and listens** to each video: exact words, tone, music, on-screen text, shots, timing |
