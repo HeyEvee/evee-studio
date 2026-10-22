@@ -9,7 +9,7 @@ export class MargoError extends Error {
 
 let client: Anthropic | null = null;
 function anthropic() {
-  if (!process.env.ANTHROPIC_API_KEY) throw new MargoError("not_configured", "Margo’s AI key isn’t set up yet.", 503);
+  if (!process.env.ANTHROPIC_API_KEY) throw new MargoError("not_configured", "Evee’s AI key isn’t set up yet.", 503);
   client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 2, timeout: 170_000 });
   return client;
 }
@@ -27,27 +27,27 @@ export async function askClaude(prompt: string, opts: { images?: ImageIn[]; maxT
       model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
       max_tokens: opts.maxTokens ?? 4000,
       system: opts.json
-        ? "You are Margo, an assistant inside a TikTok Shop creator app. Your reply is parsed by a program: reply with exactly one JSON value and nothing else."
-        : "You are Margo, an assistant inside a TikTok Shop creator app.",
+        ? "You are Evee, an assistant inside the Evee Shop app for TikTok Shop creators. Your reply is parsed by a program: reply with exactly one JSON value and nothing else."
+        : "You are Evee, an assistant inside the Evee Shop app for TikTok Shop creators.",
       messages: [{ role: "user", content }],
     });
   } catch (e: any) {
     if (e instanceof MargoError) throw e;
     const status = e?.status as number | undefined;
-    if (status === 429) throw new MargoError("busy", "Margo is busy right now. Try again in a minute.", 503);
-    if (status === 400) throw new MargoError("bad_request", "Margo couldn’t read that request. Try fewer or smaller screenshots.", 400);
-    if (status === 401 || status === 403) throw new MargoError("not_configured", "Margo’s AI key isn’t working. Check ANTHROPIC_API_KEY in Vercel.", 503);
-    throw new MargoError("upstream_error", "Margo couldn’t be reached. Try again.", 502);
+    if (status === 429) throw new MargoError("busy", "Evee is busy right now. Try again in a minute.", 503);
+    if (status === 400) throw new MargoError("bad_request", "Evee couldn’t read that request. Try fewer or smaller screenshots.", 400);
+    if (status === 401 || status === 403) throw new MargoError("not_configured", "Evee’s AI key isn’t working. Check ANTHROPIC_API_KEY in Vercel.", 503);
+    throw new MargoError("upstream_error", "Evee couldn’t be reached. Try again.", 502);
   }
   const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-  if ((res.stop_reason as string) === "refusal") throw new MargoError("refused", "Margo couldn’t work with that. Try changing the details.", 422);
+  if ((res.stop_reason as string) === "refusal") throw new MargoError("refused", "Evee couldn’t work with that. Try changing the details.", 422);
   if (!opts.json) {
-    if (!text) throw new MargoError("empty", "Margo came back empty. Try again.", 502);
+    if (!text) throw new MargoError("empty", "Evee came back empty. Try again.", 502);
     return text;
   }
-  if (res.stop_reason === "max_tokens") throw new MargoError("invalid_json", "Margo’s answer ran too long. Try asking for fewer concepts.", 502);
+  if (res.stop_reason === "max_tokens") throw new MargoError("invalid_json", "Evee’s answer ran too long. Try asking for fewer concepts.", 502);
   const parsed = parseJson(text);
-  if (parsed === undefined) throw new MargoError("invalid_json", "Margo’s answer came back garbled. Try again.", 502);
+  if (parsed === undefined) throw new MargoError("invalid_json", "Evee’s answer came back garbled. Try again.", 502);
   return parsed;
 }
 

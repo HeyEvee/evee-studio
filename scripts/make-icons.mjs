@@ -13,7 +13,7 @@ html,body{margin:0;width:${size}px;height:${size}px}
 .i::before{content:"";position:absolute;inset:${safe ? "-20%" : "-10%"} ${safe ? "-20%" : "-10%"} auto auto;width:70%;height:70%;border-radius:50%;background:#6b7a49;opacity:.55}
 .m{position:relative;font-family:B;font-weight:700;color:#f3f0ea;font-size:${Math.round(size * (safe ? 0.46 : 0.6))}px;line-height:1;letter-spacing:-.04em;transform:translateY(-3%)}
 .m span{color:#d9b48a}
-</style></head><body><div class="i"><div class="m">M<span>.</span></div></div></body></html>`;
+</style></head><body><div class="i"><div class="m">E<span>.</span></div></div></body></html>`;
 
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 for (const [name, size, safe] of [["icon-192", 192, false], ["icon-512", 512, false], ["icon-maskable-512", 512, true], ["apple-touch-icon", 180, false]]) {

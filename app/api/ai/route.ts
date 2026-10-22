@@ -3,14 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { askClaude, MargoError, type ImageIn } from "@/lib/claude";
 import { DUR, FORMATS, FW, PRODUCT_FIELDS } from "@/lib/library";
 import * as P from "@/lib/prompts";
+import { spendAllowance } from "@/lib/limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
 type Obj = Record<string, any>;
-const ACTIONS = ["brief", "extract", "concepts", "angle", "script", "hooks", "cta", "timeline", "scene", "advice"] as const;
+const ACTIONS = ["brief", "extract", "adapt", "concepts", "angle", "script", "hooks", "cta", "timeline", "scene", "advice"] as const;
 type Action = (typeof ACTIONS)[number];
-const MAX_TOKENS: Record<Action, number> = { brief: 6000, extract: 2000, concepts: 9000, angle: 3000, script: 7000, hooks: 2500, cta: 1500, timeline: 4000, scene: 1200, advice: 1800 };
+const MAX_TOKENS: Record<Action, number> = { brief: 6000, extract: 2000, adapt: 9000, concepts: 9000, angle: 3000, script: 7000, hooks: 2500, cta: 1500, timeline: 4000, scene: 1200, advice: 1800 };
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 const fail = (status: number, code: string, message: string) => NextResponse.json({ code, message }, { status });
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
   }
   const action = body?.action as Action;
   const data = (body?.data && typeof body.data === "object" ? body.data : {}) as Obj;
-  if (!ACTIONS.includes(action)) return fail(400, "bad_request", "Margo doesn’t know how to do that.");
+  if (!ACTIONS.includes(action)) return fail(400, "bad_request", "Evee doesn’t know how to do that.");
 
   try {
     // Build the prompt first, so a bad request doesn't use up the daily limit.
@@ -90,7 +91,11 @@ export async function POST(req: Request) {
       const product = cleanProduct(data.product);
       if (!product.name) return fail(400, "bad_request", "Add the product name first.");
       const h: P.Ctx = { product, opts: cleanOpts(data.opts), creator };
-      if (action === "concepts") prompt = P.conceptsPrompt(h);
+      if (action === "adapt") {
+        const { data: viral } = await supabase.from("virals").select("analysis,status").eq("id", str(data.viralId, 60)).maybeSingle();
+        if (!viral?.analysis) return fail(404, "not_found", "That viral hasn’t been broken down yet.");
+        prompt = P.adaptPrompt(h, viral);
+      } else if (action === "concepts") prompt = P.conceptsPrompt(h);
       else if (action === "angle") {
         const others = arr(data.others).slice(0, 6).map((c) => ({ name: str(c?.name, 200), framework: str(c?.framework, 4), angle: str(c?.angle, 200) }));
         const part = Number(data.part) || null;
@@ -109,13 +114,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Daily limit per tester (rolling 24 hours).
-    const limit = Number(process.env.AI_DAILY_LIMIT) || 60;
-    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const { count } = await supabase.from("ai_calls").select("id", { count: "exact", head: true }).gte("created_at", since);
-    if ((count ?? 0) >= limit) return fail(429, "rate_limited", `You’ve used Margo ${limit} times in the last 24 hours, the beta limit. Try again tomorrow.`);
-    const logged = await supabase.from("ai_calls").insert({ action });
-    if (logged.error) return fail(500, "upstream_error", "Margo couldn’t log that request. Try again.");
+    await spendAllowance(supabase, action);
 
     const result = await askClaude(prompt, { images, maxTokens: MAX_TOKENS[action], json });
     return NextResponse.json({ result });

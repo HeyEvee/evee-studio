@@ -1,6 +1,6 @@
-// Margo service worker: makes the app installable and shows a friendly page when offline.
+// Evee Shop service worker: makes the app installable and shows a friendly page when offline.
 // It never caches your data or API calls.
-const CACHE = "margo-shell-v1";
+const CACHE = "evee-shell-v2";
 const OFFLINE = "/offline.html";
 
 self.addEventListener("install", (e) => {

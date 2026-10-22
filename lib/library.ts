@@ -1,4 +1,4 @@
-// Margo's content library, shared by the app and the server.
+// Evee Shop content library, shared by the app and the server.
 // To add a framework or format, add an entry here. Nothing else needs to change.
 
 export type Framework = { id: string; name: string; alt?: string; use: string; steps: string[]; caution?: string };
@@ -66,9 +66,9 @@ export const PRODUCT_FIELDS: { k: string; l: string; sel?: boolean; ta?: boolean
   { k: "frustrations", l: "Customer frustrations or unmet needs", ta: true },
   { k: "objections", l: "Common objections", ta: true },
   { k: "different", l: "What makes it different", ta: true },
-  { k: "opinion", l: "Your experience or honest opinion", ta: true, h: "Margo only uses the personal experience you write here" },
+  { k: "opinion", l: "Your experience or honest opinion", ta: true, h: "Evee only uses the personal experience you write here" },
   { k: "price", l: "Price" },
-  { k: "link", l: "TikTok Shop link", h: "Saved for reference. Margo doesn’t open links." },
+  { k: "link", l: "TikTok Shop link", h: "Saved for reference. Evee doesn’t open links." },
   { k: "claims", l: "Claims or restrictions", ta: true, h: "Anything the brand says you can’t say" },
 ];
 

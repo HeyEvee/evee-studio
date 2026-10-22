@@ -131,9 +131,9 @@ input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-
 .hook:first-child{border-top:0;padding-top:0}
 .hook.best{background:var(--accent-soft);border:0;border-radius:14px;padding:14px}
 .hook .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-.scene{display:grid;grid-template-columns:58px 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.scene{display:grid;grid-template-columns:76px 1fr;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
 .scene:first-child{border-top:0;padding-top:0}
-.tc{font-family:var(--display);font-weight:700;font-size:14px;color:var(--accent);font-variant-numeric:tabular-nums}
+.tc{font-family:var(--display);font-weight:700;font-size:13px;white-space:nowrap;color:var(--accent);font-variant-numeric:tabular-nums}
 .scene .body{display:grid;gap:6px;min-width:0}
 .say{font-family:var(--display);font-size:16px;line-height:1.35;margin:0;overflow-wrap:anywhere}
 .ul{margin:0;padding-left:18px;display:grid;gap:4px}
@@ -164,3 +164,43 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border
 .login form{display:grid;gap:12px}
 .code{letter-spacing:.4em;font-family:var(--display);font-size:24px;text-align:center}
 .signout{display:contents}
+
+/* Evee Shop: header, feed, insights, drop */
+.topr{display:flex;align-items:center;gap:8px}
+.me{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+.me svg{width:18px;height:18px}
+.brand span{color:var(--accent)}
+.catbar{flex-wrap:nowrap;overflow-x:auto;margin-top:16px;padding-bottom:4px;scrollbar-width:none}
+.catbar .opt{white-space:nowrap}
+.vgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:500px){.vgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.vcard{appearance:none;border:0;background:none;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer;display:grid;gap:8px;min-width:0}
+.vposter{position:relative;display:block;aspect-ratio:9/14;border-radius:14px;overflow:hidden;background:var(--sunk) center/cover no-repeat;max-width:100%}
+.vposter::after{content:"";position:absolute;inset:auto 0 0;height:60%;background:linear-gradient(to top,rgb(0 0 0 / .72),transparent)}
+.vover{position:absolute;left:10px;right:10px;bottom:10px;z-index:1;display:grid;gap:1px;color:#fff;font-size:12px;font-weight:600;text-shadow:0 1px 2px rgb(0 0 0 / .4)}
+.vover b{font-family:var(--display);font-size:20px;line-height:1.1}
+.vstate{position:absolute;top:8px;left:8px;right:8px;z-index:1;background:var(--surface);color:var(--ink);font-size:12px;font-weight:600;padding:6px 8px;border-radius:10px}
+.vstate.bad{background:var(--warn-soft);color:var(--warn)}
+.vmeta{display:grid;gap:4px;min-width:0}
+.vmeta .name{font-size:14px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vmeta .chip{justify-self:start;font-size:11px}
+.vcard:focus-visible .vposter{outline:3px solid var(--accent);outline-offset:2px}
+.vhead{display:grid;grid-template-columns:112px 1fr;gap:14px;align-items:start;margin-top:4px}
+.vthumb{display:block;aspect-ratio:9/14;border-radius:12px;background:var(--sunk) center/cover no-repeat;max-width:100%}
+.vthumb.sm{width:56px}
+.vstats{display:grid;gap:4px;align-content:start;min-width:0}
+.vstats .big{font-family:var(--display);font-size:26px;line-height:1.1}
+.vstats .chip,.vstats .btn{justify-self:start}
+.hookcard{background:var(--accent-soft);border-color:transparent}
+.formula{border-color:var(--accent)}
+.looked{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;background:var(--bg);border-radius:12px;padding:10px}
+.looked p{margin:0}
+details{border-top:1px solid var(--line);padding-top:12px}
+details summary{cursor:pointer;font-weight:600;font-size:14px;margin-bottom:10px}
+details .grid2{margin-bottom:8px}
+.prog{padding:8px 0;color:var(--muted)}
+.prog.on,.prog.done{color:var(--ink)}
+.tick{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;color:var(--good);flex:none}
+.prog.done .tick{border-color:var(--good);background:var(--good-soft)}
+.latest{text-align:left;cursor:pointer;font:inherit;color:inherit;border-color:var(--accent);gap:4px}
+.latest b{font-family:var(--display);font-size:18px}

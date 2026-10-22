@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Margo",
-  description: "Your back office for TikTok Shop: daily briefs, ready-to-film scripts and results.",
+  title: "Evee Shop",
+  description: "Today’s viral TikTok Shop videos, broken down, and turned into scripts for your products. By Hey Evee.",
   manifest: "/manifest.webmanifest",
-  applicationName: "Margo",
-  appleWebApp: { capable: true, title: "Margo", statusBarStyle: "default" },
+  applicationName: "Evee Shop",
+  appleWebApp: { capable: true, title: "Evee Shop", statusBarStyle: "default" },
   icons: {
     icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
