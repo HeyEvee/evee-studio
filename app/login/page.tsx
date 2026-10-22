@@ -56,7 +56,7 @@ export default function Login() {
         <p className="date">
           {step === "email"
             ? "Evee Studio is in private beta. Use the email your invite went to."
-            : `We sent a sign-in code to ${email}.`}
+            : `We sent an 8-digit code to ${email}.`}
         </p>
       </div>
       {step === "email" ? (
@@ -71,11 +71,11 @@ export default function Login() {
       ) : (
         <form onSubmit={verify}>
           <div className="field">
-            <label htmlFor="code">Code from your email</label>
-            <input id="code" className="code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={10} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
+            <label htmlFor="code">8-digit code</label>
+            <input id="code" className="code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
           </div>
           {error && <p className="err">{error}</p>}
-          <button className="btn" disabled={busy || code.length < 6}>{busy ? "Checking…" : "Sign in"}</button>
+          <button className="btn" disabled={busy || code.length < 8}>{busy ? "Checking…" : "Sign in"}</button>
           <button type="button" className="btn plain" onClick={() => { setStep("email"); setCode(""); setError(""); }}>Use a different email or send a new code</button>
         </form>
       )}
