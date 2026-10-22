@@ -17,12 +17,19 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false } });
+    const { error } = await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: false } });
     setBusy(false);
     if (error) {
-      setError(/signups? not allowed|not found|user/i.test(error.message)
-        ? "That email isn’t on the Evee Studio beta list yet. Ask for an invite."
-        : error.message);
+      const m = error.message || "";
+      setError(
+        /signups? not allowed/i.test(m)
+          ? "That email isn’t on the Evee Studio beta list yet. Ask for an invite."
+          : /not authorized/i.test(m)
+            ? "Sign-in emails aren’t set up yet (custom email sender is off in Supabase)."
+            : /rate limit|security purposes/i.test(m)
+              ? "Too many codes requested. Wait a minute and try again."
+              : `Couldn’t send the code: ${m}`
+      );
       return;
     }
     setStep("code");
@@ -32,7 +39,7 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setBusy(true);
-    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "email" });
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.trim(), type: "email" });
     setBusy(false);
     if (error) {
       setError("That code didn’t work. Check the latest email from Evee Studio, or send a new code.");
