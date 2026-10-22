@@ -44,7 +44,7 @@ Key files: `lib/library.ts` (frameworks, formats, categories, metrics: add a fra
 ### 2. Vercel
 1. **Add New → Project →** import this GitHub repo (Next.js is detected).
 2. **Environment Variables** (all environments):
-   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`: from Supabase
+   - The Supabase URL and publishable key are already in `.env.production`, so you only add the two secret keys below.
    - `ANTHROPIC_API_KEY`: console.anthropic.com → API Keys
    - `GEMINI_API_KEY`: aistudio.google.com → Get API key (use a paid-tier project for the beta)
    - optional: `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), `GEMINI_MODEL` (default `gemini-3.8-flash`), `AI_DAILY_LIMIT` (default `60` per tester per 24h)
