@@ -21,7 +21,7 @@ export default function Login() {
     setBusy(false);
     if (error) {
       setError(/signups? not allowed|not found|user/i.test(error.message)
-        ? "That email isn’t on the Evee Shop beta list yet. Ask for an invite."
+        ? "That email isn’t on the Evee Studio beta list yet. Ask for an invite."
         : error.message);
       return;
     }
@@ -35,7 +35,7 @@ export default function Login() {
     const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "email" });
     setBusy(false);
     if (error) {
-      setError("That code didn’t work. Check the latest email from Evee Shop, or send a new code.");
+      setError("That code didn’t work. Check the latest email from Evee Studio, or send a new code.");
       return;
     }
     window.location.replace("/");
@@ -43,12 +43,12 @@ export default function Login() {
 
   return (
     <main className="login">
-      <div className="mark">Evee <span>Shop</span></div>
+      <div><div className="mark">Evee <span>Studio</span></div><p className="date">Today’s viral TikTok Shop videos, broken down for your products.</p></div>
       <div>
         <h1>{step === "email" ? "Sign in" : "Check your email"}</h1>
         <p className="date">
           {step === "email"
-            ? "Evee Shop is in private beta. Use the email your invite went to."
+            ? "Evee Studio is in private beta. Use the email your invite went to."
             : `We sent a 6-digit code to ${email}.`}
         </p>
       </div>

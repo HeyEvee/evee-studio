@@ -1,7 +1,7 @@
 {
-  "name": "Evee Shop",
-  "short_name": "Evee Shop",
-  "description": "Today’s viral TikTok Shop videos, broken down, and turned into scripts for your products. By Hey Evee.",
+  "name": "Evee Studio",
+  "short_name": "Evee Studio",
+  "description": "Today’s viral TikTok Shop videos, broken down for your products. By Hey Evee.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

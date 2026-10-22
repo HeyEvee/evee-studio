@@ -1,4 +1,4 @@
-// Evee Shop service worker: makes the app installable and shows a friendly page when offline.
+// Evee Studio service worker: makes the app installable and shows a friendly page when offline.
 // It never caches your data or API calls.
 const CACHE = "evee-shell-v2";
 const OFFLINE = "/offline.html";

@@ -27,8 +27,8 @@ export async function askClaude(prompt: string, opts: { images?: ImageIn[]; maxT
       model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
       max_tokens: opts.maxTokens ?? 4000,
       system: opts.json
-        ? "You are Evee, an assistant inside the Evee Shop app for TikTok Shop creators. Your reply is parsed by a program: reply with exactly one JSON value and nothing else."
-        : "You are Evee, an assistant inside the Evee Shop app for TikTok Shop creators.",
+        ? "You are Evee, an assistant inside the Evee Studio app for TikTok Shop creators. Your reply is parsed by a program: reply with exactly one JSON value and nothing else."
+        : "You are Evee, an assistant inside the Evee Studio app for TikTok Shop creators.",
       messages: [{ role: "user", content }],
     });
   } catch (e: any) {

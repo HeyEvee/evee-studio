@@ -1,4 +1,4 @@
-// Evee Shop content library, shared by the app and the server.
+// Evee Studio content library, shared by the app and the server.
 // To add a framework or format, add an entry here. Nothing else needs to change.
 
 export type Framework = { id: string; name: string; alt?: string; use: string; steps: string[]; caution?: string };

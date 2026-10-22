@@ -1,4 +1,4 @@
-// Evee Shop app screens. Plain DOM rendering, mounted by MargoMount.tsx.
+// Evee Studio app screens. Plain DOM rendering, mounted by MargoMount.tsx.
 // Data: Supabase "docs" table (private per tester). AI: /api/ai (prompts live on the server).
 import { FORMATS, FRAMEWORKS, FW, DUR, CATS, PRODUCT_FIELDS, PROFILE_FIELDS, PERF_FIELDS, METRICS, DEFAULT_VIBE, metrics, num } from "@/lib/library";
 
@@ -8,7 +8,7 @@ export function mount(root, { supabase, email }) {
 
   root.innerHTML = `
   <div class="app">
-    <header class="top"><div class="brand">Evee <span>Shop</span></div>
+    <header class="top"><div class="brand">Evee <span>Studio</span></div>
       <div class="topr"><div class="pill" id="status">Beta</div>
       <button class="me" data-go="you" aria-label="You and settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button></div></header>
     <main id="view"></main>
@@ -577,7 +577,7 @@ export function mount(root, { supabase, email }) {
     const sortSales = (a, b) => (num(b.gmv) ?? -1) - (num(a.gmv) ?? -1);
     todays.sort(sortSales);
     return `<div class="fade"><p class="date">${fmtDay(dayKey())}</p><h1>Today’s Virals</h1>
-      <p class="lede">Videos that are selling right now, broken down by Evee. Tap one to see why it works and use it on your product.</p>
+      <p class="lede">Today’s viral TikTok Shop videos, broken down for your products. Tap one to see why it works and use it on yours.</p>
       ${cats.length ? `<div class="opts catbar"><button class="opt" aria-pressed="${!S.vCat}" data-vcat="">All</button>${cats.map((c) => `<button class="opt" aria-pressed="${S.vCat === c}" data-vcat="${esc(c)}">${esc(c)}</button>`).join("")}</div>` : ""}
       <section>${todays.length ? `<div class="vgrid">${todays.map(viralCard).join("")}</div>`
         : `<div class="card empty"><b>No virals yet today.</b><br>Found one while scrolling? Drop it in and everyone gets Evee’s breakdown.<br><br><button class="btn" data-go="drop">Drop a video</button></div>`}</section>
@@ -889,7 +889,7 @@ export function mount(root, { supabase, email }) {
         <button class="row two" data-go="history"><span class="name">Past briefs<div class="meta">${Object.keys(S.briefs).length} saved</div></span><span class="num">›</span></button>
         <button class="row two" data-go="frameworks"><span class="name">Framework library<div class="meta">The ${FRAMEWORKS.length} structures Evee writes with</div></span><span class="num">›</span></button>
       </div></section>
-      <section><div class="card"><h2>Add Evee Shop to your home screen</h2>
+      <section><div class="card"><h2>Add Evee Studio to your home screen</h2>
         <p class="note"><b>iPhone:</b> open it in Safari, tap Share, then Add to Home Screen.<br><b>Android:</b> open it in Chrome, tap ⋮, then Install app.</p></div></section>
       <section><form method="post" action="/auth/signout" class="signout"><button class="btn plain">Sign out</button></form></section>
     </div>`;

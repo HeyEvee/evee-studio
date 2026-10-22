@@ -1,12 +1,13 @@
-# Margo
+# Evee Studio
 
-A back office for TikTok Shop affiliates, built as an installable web app (PWA).
+*Today's viral TikTok Shop videos, broken down for your products.* A sister app to Hey Evee, built as an installable web app (PWA). Planned home: **studio.heyevee.com**.
 
-- **Today:** upload yesterday's TikTok Shop screenshots and get a daily brief: best sellers, what to retarget, and problem → solution video ideas.
-- **Studio:** turn any product into ready-to-film concepts, hooks and shot-by-shot scripts using the 80/20 framework library.
-- **Scripts:** saved scripts with search, filters, status, editing and export.
-- **Results:** log real video numbers, compare like with like, and get suggested experiments.
-- **You:** creator profile, framework library, past briefs.
+- **Today's Virals:** a shared feed of TikTok Shop videos testers dropped in today, highest sales first, with est. commission, views and category filters.
+- **Insights:** Evee watches and listens to each video once, then shows the hook word for word, the second-by-second flow, the framework, why it probably worked, and a fill-in-the-blank "Steal the structure."
+- **Use this on my product:** 3 ready-to-film scripts that reuse a viral's structure for your product, in your words, with full shot-by-shot scripts, filming checklist and caption.
+- **Drop a Video:** paste a TikTok link + the saved video file. Evee breaks it down and adds it to the feed for everyone.
+- **My Scripts:** saved scripts, status, results tracking and suggested experiments.
+- **You:** creator profile, daily sales brief from screenshots, framework library, sign out.
 
 Private beta: invite-only, free.
 
@@ -14,66 +15,57 @@ Private beta: invite-only, free.
 
 | Piece | What it does |
 | --- | --- |
-| Next.js 14 (App Router) on Vercel | The app, the login and the API |
-| Supabase Auth | Email + 6-digit code sign-in. Invite-only (signups off). |
-| Supabase Postgres (`docs`, `ai_calls`) | Each tester's data, locked to them with row-level security |
-| `/api/ai` | The only way the app reaches Claude. Prompts live on the server (`lib/prompts.ts`); the phone can only ask for fixed jobs. |
-| Anthropic API | Reads screenshots and writes briefs and scripts. The key stays on the server. |
-| `public/manifest.webmanifest`, `public/sw.js` | Add to Home Screen, app icon, offline page |
+| Next.js 14 on Vercel | The app, login and API |
+| Supabase Auth | Email + 6-digit code sign-in, invite-only |
+| Supabase Postgres | `docs` (each tester's private data), `virals` (the shared feed), `ai_calls` (daily limits) |
+| Supabase Storage (`virals` bucket) | Dropped videos (deleted after Evee watches them) and their cover frames |
+| Google Gemini (`lib/gemini.ts`) | Watches **and listens** to each video: exact words, tone, music, on-screen text, shots, timing |
+| Anthropic Claude (`lib/claude.ts`) | Turns Gemini's notes into the framework, and writes every script |
+| `/api/viral`, `/api/ai` | The only way the app reaches the AI. Prompts live on the server (`lib/prompts.ts`). Keys never reach the phone. |
 
-Key files:
-
-- `lib/library.ts`: frameworks, formats, categories, metrics. **Add a framework here** and it shows up everywhere.
-- `lib/prompts.ts`: everything Margo is told.
-- `app/margo/app.js`: the app screens.
-- `app/api/ai/route.ts`: input checks, daily limit, Claude call.
-- `supabase/schema.sql`: the database.
+Key files: `lib/library.ts` (frameworks, formats, categories, metrics: add a framework here), `lib/prompts.ts` (everything Evee is told), `app/margo/app.js` (the screens), `supabase/schema.sql` (database + storage).
 
 ## Setup (one time)
 
 ### 1. Supabase
 1. Create a project at supabase.com.
-2. **SQL Editor → New query**: paste all of `supabase/schema.sql` and click **Run**.
-3. **Authentication → Sign In / Providers → Email**: keep Email on. Turn **off** "Allow new users to sign up" so only invited people can get in.
-4. **Authentication → Emails → Magic Link** template: replace the body so it shows the code (the app signs in with the code, which works inside the iPhone home-screen app):
+2. **SQL Editor → New query**: paste all of `supabase/schema.sql`, click **Run**. This creates the tables, the private `virals` storage bucket and all access rules.
+3. **Authentication → Sign In / Providers → Email**: keep Email on, turn **off** "Allow new users to sign up".
+4. **Authentication → Emails → Magic Link**: replace the body so it shows the code:
    ```html
-   <h2>Your Margo code</h2>
-   <p>Enter this code in Margo to sign in:</p>
+   <h2>Your Evee Studio code</h2>
+   <p>Enter this code to sign in:</p>
    <p style="font-size:28px;letter-spacing:6px"><b>{{ .Token }}</b></p>
    <p>It expires in an hour. If you didn't ask for it, ignore this email.</p>
    ```
-5. **Authentication → URL Configuration**: set **Site URL** to your Vercel URL once you have it.
+5. **Authentication → URL Configuration**: Site URL = `https://studio.heyevee.com` (or your Vercel URL until the domain is set).
 6. **Project Settings → API**: copy the Project URL and the anon (publishable) key.
 
 ### 2. Vercel
-1. **Add New → Project →** import this GitHub repo. Framework: Next.js (auto-detected).
+1. **Add New → Project →** import this GitHub repo (Next.js is detected).
 2. **Environment Variables** (all environments):
-   - `NEXT_PUBLIC_SUPABASE_URL`: Supabase Project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon / publishable key
-   - `ANTHROPIC_API_KEY`: from console.anthropic.com → API Keys (secret, server only)
-   - `ANTHROPIC_MODEL` (optional): defaults to `claude-sonnet-5-5`
-   - `AI_DAILY_LIMIT` (optional): requests per tester per 24 hours, default `60`
-3. **Deploy.** Every push to `main` redeploys automatically.
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`: from Supabase
+   - `ANTHROPIC_API_KEY`: console.anthropic.com → API Keys
+   - `GEMINI_API_KEY`: aistudio.google.com → Get API key (use a paid-tier project for the beta)
+   - optional: `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), `GEMINI_MODEL` (default `gemini-3.8-flash`), `AI_DAILY_LIMIT` (default `60` per tester per 24h)
+3. **Settings → Functions**: make sure Fluid Compute is on so video breakdowns can run up to 5 minutes.
+4. **Deploy.** Every push to `main` redeploys.
 
-### 3. Invite testers
-Supabase → **Authentication → Users → Invite user** → their email. They open the Vercel URL, enter that email, get a 6-digit code, and they're in. Invite yourself first.
+### 3. studio.heyevee.com
+Vercel project → **Settings → Domains → Add** `studio.heyevee.com`, then add the DNS record Vercel shows (usually a CNAME `studio` → `cname.vercel-dns.com`) wherever heyevee.com's DNS lives.
 
-### 4. Put it on your phone
-- **iPhone:** open the URL in Safari → Share → **Add to Home Screen**.
-- **Android:** open it in Chrome → ⋮ → **Install app**.
+### 4. Invite testers
+Supabase → **Authentication → Users → Invite user**. Invite yourself first.
 
-## Local development
-```bash
-cp .env.example .env.local   # fill in the values
-npm install
-npm run dev                  # http://localhost:3000
-```
+### 5. On your phone
+iPhone: Safari → Share → **Add to Home Screen**. Android: Chrome → ⋮ → **Install app**.
 
-## Costs to expect
-- Vercel Hobby and Supabase Free cover a small beta.
-- Anthropic usage is pay-as-you-go per request. Screenshot briefs and full scripts are the biggest requests. `AI_DAILY_LIMIT` caps each tester.
+## Running costs
+- Vercel Hobby and Supabase Free cover a small beta (Supabase Free: 1 GB storage; videos are deleted after analysis).
+- Each dropped video = one Gemini watch + one Claude breakdown. It's analyzed once and shared with everyone.
+- Each "Use this on my product" and full script = one Claude request. `AI_DAILY_LIMIT` caps each tester.
 
 ## Later
-- **App Store / Play Store:** wrap this app with Capacitor, or rebuild the screens in Expo and keep the same Supabase + `/api/ai` backend.
-- **Paid plans:** add Stripe Checkout + a webhook that marks the tester's plan in Supabase.
-- **Automatic data:** TikTok Shop Partner Center API, once approved, replaces screenshot uploads.
+- **Automatic daily feed:** plug a TikTok Shop data provider (e.g. EchoTik) into the feed, after confirming it has a daily top-videos ranking, video file access, and allows display in a paid app.
+- **Hey Evee bundle / one login:** move both apps onto shared accounts; include Evee Studio in Lifetime VIP or as an add-on.
+- **App Store / Play Store:** wrap with Capacitor, or rebuild screens in Expo on the same backend.
