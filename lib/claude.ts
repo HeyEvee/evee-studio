@@ -35,7 +35,7 @@ export async function askClaude(prompt: string, opts: { images?: ImageIn[]; maxT
     if (e instanceof MargoError) throw e;
     const status = e?.status as number | undefined;
     if (status === 429) throw new MargoError("busy", "Evee is busy right now. Try again in a minute.", 503);
-    if (status === 400) throw new MargoError("bad_request", "Evee couldn’t read that request. Try fewer or smaller screenshots.", 400);
+    if (status === 400) throw new MargoError("bad_request", "Evee couldn’t read that request. Try shortening the details.", 400);
     if (status === 401 || status === 403) throw new MargoError("not_configured", "Evee’s AI key isn’t working. Check ANTHROPIC_API_KEY in Vercel.", 503);
     throw new MargoError("upstream_error", "Evee couldn’t be reached. Try again.", 502);
   }

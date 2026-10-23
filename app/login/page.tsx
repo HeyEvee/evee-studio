@@ -50,7 +50,7 @@ export default function Login() {
 
   return (
     <main className="login">
-      <div><div className="mark">Evee <span>Studio</span></div><p className="date">Today’s viral TikTok Shop videos, broken down for your products.</p></div>
+      <div><div className="mark">Evee <span>Studio</span></div><p className="date">Viral TikTok Shop scripts for your products, with coaching.</p></div>
       <div>
         <h1>{step === "email" ? "Sign in" : "Check your email"}</h1>
         <p className="date">

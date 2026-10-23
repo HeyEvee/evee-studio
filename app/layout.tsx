@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Evee Studio",
-  description: "Today’s viral TikTok Shop videos, broken down for your products. By Hey Evee.",
+  description: "Viral TikTok Shop scripts for your products, with coaching. By Hey Evee.",
   manifest: "/manifest.webmanifest",
   applicationName: "Evee Studio",
   appleWebApp: { capable: true, title: "Evee Studio", statusBarStyle: "default" },

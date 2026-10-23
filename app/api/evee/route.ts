@@ -1,0 +1,55 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { askClaude, MargoError } from "@/lib/claude";
+import { spendAllowance } from "@/lib/limit";
+import { FW, LENGTHS, STYLES } from "@/lib/library";
+import { createPrompt, remixPrompt, type Opts, type Product } from "@/lib/studio";
+
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
+const fail = (status: number, code: string, message: string) => NextResponse.json({ code, message }, { status });
+const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+export async function POST(req: Request) {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return fail(401, "unauthorized", "You’ve been signed out. Sign in again.");
+  let body: any;
+  try { body = await req.json(); } catch { return fail(400, "bad_request", "That request couldn’t be read."); }
+
+  const p: Product = { name: str(body?.product?.name, 200), price: str(body?.product?.price, 40), audience: str(body?.product?.audience, 400), details: str(body?.product?.details, 2000) };
+  if (!p.name) return fail(400, "bad_request", "Add the product name first.");
+  const o: Opts = {
+    style: STYLES[body?.opts?.style] ? body.opts.style : "any",
+    length: LENGTHS[body?.opts?.length] ? body.opts.length : "medium",
+    framework: FW[body?.opts?.framework] ? body.opts.framework : undefined,
+  };
+
+  try {
+    const prof = await supabase.from("docs").select("data").eq("id", "profile").maybeSingle();
+    const c = (prof.data?.data as any)?.creator || {};
+    const voice = { vibe: str(c.vibe, 600), phrases: str(c.phrases, 600), avoid: str(c.avoid, 600) };
+
+    if (body?.action === "create") {
+      await spendAllowance(supabase, "create");
+      const out: any = await askClaude(createPrompt(p, o, voice), { json: true, maxTokens: 4500 });
+      const scripts = (Array.isArray(out?.scripts) ? out.scripts : []).filter((s: any) => s && s.hook).slice(0, 3);
+      if (!scripts.length) throw new MargoError("invalid_json", "Evee didn’t return any scripts. Try again.", 502);
+      return NextResponse.json({ result: { coach: out.coach || {}, scripts } });
+    }
+    if (body?.action === "remix") {
+      const prev = body?.prev || {};
+      if (!FW[prev.framework]) return fail(400, "bad_request", "That script’s framework is missing.");
+      await spendAllowance(supabase, "remix");
+      const s: any = await askClaude(remixPrompt(p, o, voice, { framework: prev.framework, hook: prev.hook }), { json: true, maxTokens: 1800 });
+      if (!s?.hook) throw new MargoError("invalid_json", "Evee’s new version came back incomplete. Try again.", 502);
+      return NextResponse.json({ result: { ...s, framework: prev.framework } });
+    }
+    return fail(400, "bad_request", "Evee doesn’t know how to do that.");
+  } catch (e: any) {
+    if (e instanceof MargoError) return fail(e.status, e.code, e.message);
+    console.error("evee route error", e);
+    return fail(500, "upstream_error", "Something went wrong. Try again.");
+  }
+}

@@ -1,13 +1,12 @@
 # Evee Studio
 
-*Today's viral TikTok Shop videos, broken down for your products.* A sister app to Hey Evee, built as an installable web app (PWA). Planned home: **studio.heyevee.com**.
+*Viral TikTok Shop scripts for your products, with coaching.* A sister app to Hey Evee, built as an installable web app (PWA).
 
-- **Today's Virals:** a shared feed of TikTok Shop videos testers dropped in today, highest sales first, with est. commission, views and category filters.
-- **Insights:** Evee watches and listens to each video once, then shows the hook word for word, the second-by-second flow, the framework, why it probably worked, and a fill-in-the-blank "Steal the structure."
-- **Use this on my product:** 3 ready-to-film scripts that reuse a viral's structure for your product, in your words, with full shot-by-shot scripts, filming checklist and caption.
-- **Drop a Video:** paste a TikTok link + the saved video file. Evee breaks it down and adds it to the feed for everyone.
-- **My Scripts:** saved scripts, status, results tracking and suggested experiments.
-- **You:** creator profile, daily sales brief from screenshots, framework library, sign out.
+- **Today:** log yesterday's best sellers in 30 seconds (product, units sold, optional sales $). Evee tracks them over time and tells you what to post today: products on a streak, new winners, sudden jumps, and products going quiet. One tap writes scripts for any of them.
+- **Create:** enter product, price, who it's for and an optional note. Evee picks the 3 best frameworks from the built-in library and writes 3 ready-to-film scripts (hook, time-coded beats, CTA, caption, hashtags) plus coaching: which to film first, the angle that matters, what to test, filming tips and one thing to watch out for.
+- **Saved:** scripts you keep, marked To film / Filmed / Posted. Copy, new version, delete.
+- **Frameworks:** the 15 built-in viral frameworks with beats, best uses and Evee's tip. Pick one to write with it.
+- **You:** name, your voice (how you come across, phrases you say, words to avoid), sign out.
 
 Private beta: invite-only, free.
 
@@ -17,13 +16,11 @@ Private beta: invite-only, free.
 | --- | --- |
 | Next.js 14 on Vercel | The app, login and API |
 | Supabase Auth | Email + 8-digit code sign-in, invite-only |
-| Supabase Postgres | `docs` (each tester's private data), `virals` (the shared feed), `ai_calls` (daily limits) |
-| Supabase Storage (`virals` bucket) | Dropped videos (deleted after Evee watches them) and their cover frames |
-| Google Gemini (`lib/gemini.ts`) | Watches **and listens** to each video: exact words, tone, music, on-screen text, shots, timing |
-| Anthropic Claude (`lib/claude.ts`) | Turns Gemini's notes into the framework, and writes every script |
-| `/api/viral`, `/api/ai` | The only way the app reaches the AI. Prompts live on the server (`lib/prompts.ts`). Keys never reach the phone. |
+| Supabase Postgres | `docs` (each person's private data: profile, products, sales days, saved scripts), `ai_calls` (daily limits) |
+| Anthropic Claude (`lib/claude.ts`) | Writes every script and the coaching |
+| `/api/evee` | The only way the app reaches the AI. Prompts live on the server (`lib/studio.ts`). The key never reaches the phone. |
 
-Key files: `lib/library.ts` (frameworks, formats, categories, metrics: add a framework here), `lib/prompts.ts` (everything Evee is told), `app/margo/app.js` (the screens), `supabase/schema.sql` (database + storage).
+Key files: `lib/library.ts` (the 15 frameworks: add one here), `lib/studio.ts` (everything Evee is told), `app/margo/app.js` (the screens), `supabase/schema.sql` (database). The "What to post today" suggestions are simple rules in `app.js` (`recommendations()`), so they're instant and free.
 
 ## Setup (one time)
 
@@ -46,9 +43,7 @@ Key files: `lib/library.ts` (frameworks, formats, categories, metrics: add a fra
 2. **Environment Variables** (all environments):
    - The Supabase URL and publishable key are already in `.env.production`, so you only add the two secret keys below.
    - `ANTHROPIC_API_KEY`: console.anthropic.com → API Keys
-   - `GEMINI_API_KEY`: aistudio.google.com → Get API key (use a paid-tier project for the beta)
-   - optional: `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), `GEMINI_MODEL` (default `gemini-3.8-flash`), `AI_DAILY_LIMIT` (default `60` per tester per 24h)
-3. **Settings → Functions**: make sure Fluid Compute is on so video breakdowns can run up to 5 minutes.
+   - optional: `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), `AI_DAILY_LIMIT` (default `60` per tester per 24h)
 4. **Deploy.** Every push to `main` redeploys.
 
 ### 3. studio.heyevee.com
@@ -61,11 +56,10 @@ Supabase → **Authentication → Users → Invite user**. Invite yourself first
 iPhone: Safari → Share → **Add to Home Screen**. Android: Chrome → ⋮ → **Install app**.
 
 ## Running costs
-- Vercel Hobby and Supabase Free cover a small beta (Supabase Free: 1 GB storage; videos are deleted after analysis).
-- Each dropped video = one Gemini watch + one Claude breakdown. It's analyzed once and shared with everyone.
-- Each "Use this on my product" and full script = one Claude request. `AI_DAILY_LIMIT` caps each tester.
+- Vercel Hobby and Supabase Free cover a small beta.
+- Each "Write my scripts" and each "New version" is one Claude request. `AI_DAILY_LIMIT` caps each person per 24 hours. Logging sales and the "What to post today" suggestions cost nothing.
 
 ## Later
-- **Automatic daily feed:** plug a TikTok Shop data provider (e.g. EchoTik) into the feed, after confirming it has a daily top-videos ranking, video file access, and allows display in a paid app.
+- **Automatic sales:** TikTok Shop Partner Center API, once approved, replaces typing in best sellers.
 - **Hey Evee bundle / one login:** move both apps onto shared accounts; include Evee Studio in Lifetime VIP or as an add-on.
 - **App Store / Play Store:** wrap with Capacitor, or rebuild screens in Expo on the same backend.
