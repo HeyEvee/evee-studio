@@ -54,6 +54,7 @@ export function mount(root, { supabase, email }) {
     mode: "write", paste: "", useProduct: false, analysis: null,
     saved: {}, products: [], filter: "", confirmDel: false,
     sales: {}, log: null, // log = { date, rows } while editing
+    perfDraft: null,
     profile: { name: "", creator: { vibe: DEFAULT_VOICE, phrases: "", avoid: "", identity: "" } },
   };
 
@@ -226,6 +227,7 @@ export function mount(root, { supabase, email }) {
       </section>` : ready && Object.keys(S.sales).length ? `<section><div class="card empty">Log a couple more days and Evee will start spotting streaks and products going quiet.</div></section>` : ""}
       ${!Object.keys(S.sales).length && ready ? `<section class="example"><div class="sechead"><h2>What you’ll see</h2><span class="pill warn">Example</span></div>
         <div class="rt"><div class="sechead"><span class="chip streak">On a streak</span>${spark([2, 3, 5, 4, 6, 9, 14])}</div><h2>Mini car vacuum</h2><p class="why">Up 3 days in a row (6 → 9 → 14). Post 2–3 more while it’s climbing.</p></div></section>` : ""}
+      ${workingCard(true)}
       ${Object.keys(salesByProduct()).length ? productTable() : ""}
       ${pastDays.length ? `<section><div class="sechead"><h2>Past days</h2><button class="btn plain small" data-log="${dayKey()}">Log another day</button></div>
         <div class="list">${pastDays.map((d) => { const rows = arr(S.sales[d].rows).filter((r) => r.name); const u = rows.reduce((s, r) => s + (num(r.units) || 0), 0); const top = rows.slice().sort((a, b) => (num(b.units) || 0) - (num(a.units) || 0))[0];
@@ -458,6 +460,49 @@ export function mount(root, { supabase, email }) {
     root.querySelector("#analysis")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /* ================= RESULTS: what's working for you ================= */
+  const perfOf = (d) => { const p = d.perf || {}; const v = num(p.views), o = num(p.orders); return { views: v, orders: o, clicks: num(p.clicks), gmv: num(p.gmv), per1k: v > 0 && o != null ? (o / v) * 1000 : null }; };
+  const hasPerf = (d) => num(d.perf?.views) > 0 && num(d.perf?.orders) != null;
+  function leaderboard() {
+    const agg = {};
+    for (const d of Object.values(S.saved)) {
+      if (!hasPerf(d)) continue; const fw = d.script?.framework; if (!FW[fw]) continue; const m = perfOf(d);
+      const a = (agg[fw] ??= { fw, videos: 0, views: 0, orders: 0, gmv: 0, hasGmv: false });
+      a.videos++; a.views += m.views; a.orders += m.orders; if (m.gmv != null) { a.gmv += m.gmv; a.hasGmv = true; }
+    }
+    return Object.values(agg).map((a) => ({ ...a, per1k: a.views ? (a.orders / a.views) * 1000 : 0 })).sort((x, y) => y.per1k - x.per1k);
+  }
+  const fmtShort = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(Math.round(n)));
+  function workingCard(compact) {
+    const rows = leaderboard();
+    if (!rows.length) return compact ? "" : `<section><div class="card empty working"><b>What’s working for you</b><br>Mark a saved script <b>Posted</b> and add its views and orders. Evee ranks your frameworks by what actually sells for you, and leans on your winners.</div></section>`;
+    const top = rows[0], total = rows.reduce((s, r) => s + r.videos, 0);
+    return `<section><div class="card working">
+      <div class="sechead"><h2>What’s working for you</h2><small>${total} posted video${total === 1 ? "" : "s"}</small></div>
+      <p class="note">Ranked by orders per 1,000 views, the number that shows a video sells and doesn’t just get seen.</p>
+      <div class="lb">${rows.slice(0, compact ? 3 : 10).map((r, i) => `<div class="lbrow"><span class="rank">${i + 1}</span>
+        <span class="name">${esc(FW[r.fw].name)}<div class="meta">${r.videos} video${r.videos === 1 ? "" : "s"} · ${fmtShort(r.views)} views · ${r.orders} orders${r.hasGmv ? ` · ${money(r.gmv)}` : ""}${r.videos < 3 ? ` · <span class="early">early signal</span>` : ""}</div></span>
+        <span class="num">${r.per1k.toFixed(1)}<small class="meta">per 1K</small></span></div>`).join("")}</div>
+      ${top.videos >= 3 ? `<p class="note">Evee leans on <b>${esc(FW[top.fw].name)}</b> when it fits, and keeps testing others.</p>` : `<p class="note">Post a few more and the ranking gets more reliable. Under 3 videos is an early signal, not proof.</p>`}
+      ${compact ? "" : `<button class="btn ghost small" data-usefw="${top.fw}">Write scripts with your top framework</button>`}
+    </div></section>`;
+  }
+  function resultsBox(d) {
+    const P = S.perfDraft || {}, m = perfOf({ perf: P });
+    return `<div class="card results">
+      <h2>How did it do?</h2>
+      <p class="note">From TikTok analytics for this video. Views and orders matter most.</p>
+      <div class="grid2">
+        <div class="field"><label for="rv">Views</label><input type="text" inputmode="numeric" id="rv" data-bind="perfDraft.views" value="${esc(P.views ?? "")}" placeholder="12,400"></div>
+        <div class="field"><label for="ro">Orders</label><input type="text" inputmode="numeric" id="ro" data-bind="perfDraft.orders" value="${esc(P.orders ?? "")}" placeholder="18"></div>
+        <div class="field"><label for="rc">Product clicks <span class="hint">· optional</span></label><input type="text" inputmode="numeric" id="rc" data-bind="perfDraft.clicks" value="${esc(P.clicks ?? "")}"></div>
+        <div class="field"><label for="rg">Sales $ <span class="hint">· optional</span></label><input type="text" inputmode="decimal" id="rg" data-bind="perfDraft.gmv" value="${esc(P.gmv ?? "")}"></div>
+      </div>
+      ${hasPerf(d) ? `<p class="readok">${m.per1k != null ? `<b>${m.per1k.toFixed(1)} orders per 1K views</b>` : ""}${m.clicks != null && m.views ? ` · ${((m.clicks / m.views) * 100).toFixed(1)}% clicked the product` : ""}</p>` : ""}
+      <button class="btn" data-act="saveperf">Save results</button>
+    </div>`;
+  }
+
   /* ================= SAVED ================= */
   const STATUS = { idea: "To film", filmed: "Filmed", posted: "Posted" };
   function saved() {
@@ -465,9 +510,10 @@ export function mount(root, { supabase, email }) {
     const list = all.filter((d) => !S.filter || (d.status || "idea") === S.filter);
     return `<div class="fade"><h1>Saved</h1><p class="date">${all.length} ${all.length === 1 ? "script" : "scripts"}</p>
       ${all.length ? `<div class="opts" style="margin-top:14px"><button class="opt" aria-pressed="${!S.filter}" data-filter="">All</button>${Object.entries(STATUS).map(([k, l]) => `<button class="opt" aria-pressed="${S.filter === k}" data-filter="${k}">${l}</button>`).join("")}</div>` : ""}
+      ${all.length ? workingCard(false) : ""}
       <section>${!all.length ? `<div class="card empty">Scripts you save show up here, ready to film.<br><br><button class="btn" data-go="create">Write scripts</button></div>`
         : !list.length ? `<div class="card empty">Nothing here yet.</div>`
-        : `<div class="list">${list.map((d) => `<button class="row two" data-saved="${d.id}"><span class="name">${esc(d.script?.title || FW[d.script?.framework]?.name)}<div class="meta">${esc(d.product?.name)} · ${esc(FW[d.script?.framework]?.name || "")} · ${shortDay(d.createdAt)}</div></span><span class="num"><span class="chip ${d.status || "idea"}">${STATUS[d.status || "idea"]}</span></span></button>`).join("")}</div>`}</section>
+        : `<div class="list">${list.map((d) => `<button class="row two" data-saved="${d.id}"><span class="name">${esc(d.script?.title || FW[d.script?.framework]?.name)}<div class="meta">${esc(d.product?.name)} · ${esc(FW[d.script?.framework]?.name || "")} · ${shortDay(d.createdAt)}${hasPerf(d) ? ` · ${fmtShort(perfOf(d).views)} views, ${perfOf(d).orders} orders` : ""}</div></span><span class="num"><span class="chip ${d.status || "idea"}">${(d.status || "idea") === "posted" && !hasPerf(d) ? "Add results" : STATUS[d.status || "idea"]}</span></span></button>`).join("")}</div>`}</section>
     </div>`;
   }
   function savedView(id) {
@@ -476,6 +522,7 @@ export function mount(root, { supabase, email }) {
     return `<div class="fade"><button class="back" data-act="back">← Saved</button>
       <p class="date">${esc(d.product?.name)}${d.product?.price ? ` · ${esc(d.product.price)}` : ""}</p>
       <div class="opts" style="margin-top:10px">${Object.entries(STATUS).map(([k, l]) => `<button class="opt" aria-pressed="${(d.status || "idea") === k}" data-status="${k}">${l}</button>`).join("")}</div>
+      ${(d.status || "idea") === "posted" ? `<section>${resultsBox(d)}</section>` : `<p class="note" style="margin-top:10px">Mark it <b>Posted</b> after you post it to log how it did.</p>`}
       <section>${scriptCard(d.script, 0, { kind: "saved", id })}${errBox()}</section>
       <section>${S.confirmDel ? `<div class="card"><p>Delete this script for good?</p><div class="btns"><button class="btn" data-act="del">Delete</button><button class="btn ghost" data-act="canceldel">Keep it</button></div></div>` : `<button class="btn plain" data-act="askdel">Delete script</button>`}</section>
     </div>`;
@@ -537,10 +584,10 @@ export function mount(root, { supabase, email }) {
     if (d.open !== undefined) { S.open[d.open] = true; render(true); return; }
     if (d.close !== undefined) { S.open[d.close] = false; render(true); return; }
     if (d.recent) { const x = S.products.find((p) => p.name === d.recent); if (x) { S.product = { ...blankProduct(), ...x }; render(true); } return; }
-    if (d.saved) { push("k:" + d.saved); return; }
+    if (d.saved) { S.perfDraft = clone(S.saved[d.saved]?.perf || {}); push("k:" + d.saved); return; }
     if (d.filter !== undefined) { S.filter = d.filter; render(true); return; }
     if (d.usefw) { S.opts.framework = d.usefw; go("create"); toast(`Using ${FW[d.usefw].name}. Add your product.`); return; }
-    if (d.status) { const id = stack[stack.length - 1].slice(2), doc = S.saved[id]; if (doc) { doc.status = d.status; persist("k-" + id, doc, "the status"); render(true); } return; }
+    if (d.status) { const id = stack[stack.length - 1].slice(2), doc = S.saved[id]; if (doc) { doc.status = d.status; if (d.status === "posted" && !doc.postedAt) doc.postedAt = new Date().toISOString(); persist("k-" + id, doc, "the status"); render(true); } return; }
     if (d.save !== undefined) {
       const s = S.result?.scripts[+d.save]; if (!s) return;
       const id = uid(); const sc = clone(s); delete sc.savedId;
@@ -576,6 +623,11 @@ export function mount(root, { supabase, email }) {
       case "askdel": S.confirmDel = true; render(true); break;
       case "canceldel": S.confirmDel = false; render(true); break;
       case "del": { const id = stack[stack.length - 1].slice(2); delDoc("k-" + id).then(() => { delete S.saved[id]; if (S.result) for (const s of S.result.scripts) if (s.savedId === id) delete s.savedId; go("saved"); toast("Deleted"); }, () => toast("Couldn’t delete. Check your connection.")); break; }
+      case "saveperf": { const id = stack[stack.length - 1].slice(2), doc = S.saved[id]; if (!doc) break; const P = S.perfDraft || {};
+        const v = num(P.views), o = num(P.orders);
+        if (v == null || o == null) { S.err = "Add views and orders (0 orders is fine)."; render(true); break; }
+        doc.perf = { views: v, orders: o, clicks: num(P.clicks), gmv: num(P.gmv), updatedAt: new Date().toISOString() }; S.err = "";
+        persist("k-" + id, doc, "your results"); toast("Results saved. Evee will learn from this."); render(true); break; }
       case "saveprofile": persist("profile", S.profile, "your profile").then(() => toast("Saved")); break;
     }
   });

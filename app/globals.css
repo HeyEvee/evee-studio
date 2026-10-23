@@ -286,3 +286,10 @@ details.fw .btn{justify-self:start}
 .spine{display:grid;gap:4px}
 .spine p{margin:0}
 details.formula{border-color:var(--accent)}
+
+.working{border-color:var(--accent)}
+.lb{display:grid}
+.lbrow{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.lbrow:first-child{border-top:0}
+.early{color:var(--warn)}
+.results{border-color:var(--accent)}

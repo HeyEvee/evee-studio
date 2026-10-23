@@ -42,7 +42,18 @@ const FORMAT_RULES = `FORMAT (match this exactly)
 - Use bracketed prompts like [your honest first reaction] wherever her real experience is needed.
 - breakdown: explain why it converts like a strategist reviewing a winning video. Specific, not generic.`;
 
-export function createPrompt(p: Product, o: Opts, voice: Voice) {
+export type FwResult = { framework: string; videos: number; views: number; orders: number; gmv: number | null; per1k: number | null };
+
+// Turns her logged results into a short, honest summary Evee can learn from.
+export function resultsText(rows: FwResult[]) {
+  const usable = rows.filter((r) => r.videos > 0 && r.views > 0).sort((a, b) => (b.per1k ?? -1) - (a.per1k ?? -1));
+  if (!usable.length) return "";
+  return `HER OWN RESULTS (from videos she posted using Evee's scripts; orders per 1,000 views is the main measure)
+${usable.map((r) => `- ${r.framework} (${FW[r.framework]?.name || "unknown"}): ${r.videos} video${r.videos > 1 ? "s" : ""}, ${r.views.toLocaleString()} views, ${r.orders} orders, ${r.per1k == null ? "n/a" : r.per1k.toFixed(2)} orders per 1K views${r.gmv != null ? `, $${Math.round(r.gmv)} sales` : ""}${r.videos < 3 ? " (early signal)" : ""}`).join("\n")}
+How to use this: when a framework that has sold well for HER also fits this product, prefer it, but always keep at least one of the 3 scripts as a test of a different framework. Treat anything with fewer than 3 videos as an early signal, not proof. In coach.filmFirst, say when a pick is based on her results.`;
+}
+
+export function createPrompt(p: Product, o: Opts, voice: Voice, results = "") {
   const forced = o.framework && FW[o.framework];
   const task = forced
     ? `Write 3 different versions using the "${forced.id}" framework. Each takes a different angle or hook.`
@@ -59,7 +70,7 @@ STYLE: ${STYLES[o.style] || STYLES.any}${o.style === "silent" ? " (every \"say\"
 LENGTH: ${LENGTHS[o.length] || LENGTHS.medium}
 
 ${playbookText()}
-
+${results ? "\n" + results + "\n" : ""}
 VIRAL FRAMEWORK LIBRARY
 ${libText(forced ? [forced.id] : undefined)}
 

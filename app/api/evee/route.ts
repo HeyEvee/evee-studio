@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { askClaude, MargoError } from "@/lib/claude";
 import { spendAllowance } from "@/lib/limit";
 import { FW, LENGTHS, STYLES } from "@/lib/library";
-import { analyzePrompt, createPrompt, readSalesPrompt, remixPrompt, type Opts, type Product } from "@/lib/studio";
+import { analyzePrompt, createPrompt, readSalesPrompt, remixPrompt, resultsText, type FwResult, type Opts, type Product } from "@/lib/studio";
 import type { ImageIn } from "@/lib/claude";
 
 export const runtime = "nodejs";
@@ -79,7 +79,18 @@ export async function POST(req: Request) {
 
     if (body?.action === "create") {
       await spendAllowance(supabase, "create");
-      const out: any = await askClaude(createPrompt(p, o, voice), { json: true, maxTokens: 8500 });
+      const docs = await supabase.from("docs").select("data").like("id", "k-%").limit(500);
+      const agg: Record<string, FwResult> = {};
+      for (const r of docs.data || []) {
+        const d: any = r.data || {}, fw = d.script?.framework, pf = d.perf || {};
+        const views = Number(pf.views), orders = Number(pf.orders);
+        if (!FW[fw] || !(views > 0) || !(orders >= 0)) continue;
+        const a = (agg[fw] ??= { framework: fw, videos: 0, views: 0, orders: 0, gmv: null, per1k: null });
+        a.videos++; a.views += views; a.orders += orders;
+        if (Number(pf.gmv) >= 0 && pf.gmv !== "" && pf.gmv != null) a.gmv = (a.gmv || 0) + Number(pf.gmv);
+      }
+      for (const a of Object.values(agg)) a.per1k = a.views ? (a.orders / a.views) * 1000 : null;
+      const out: any = await askClaude(createPrompt(p, o, voice, resultsText(Object.values(agg))), { json: true, maxTokens: 8500 });
       const scripts = (Array.isArray(out?.scripts) ? out.scripts : []).filter((s: any) => s && s.hook).slice(0, 3);
       if (!scripts.length) throw new MargoError("invalid_json", "Evee didn’t return any scripts. Try again.", 502);
       return NextResponse.json({ result: { coach: out.coach || {}, scripts } });
