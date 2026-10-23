@@ -4,6 +4,7 @@
 
 - **Today:** log yesterday’s best sellers from screenshots (several at once; Evee reads them and you check) or by typing (product, units sold, optional sales $). Evee tracks them over time and tells you what to post today: products on a streak, new winners, sudden jumps, and products going quiet. One tap writes scripts for any of them.
 - **Create:** enter product, price, who it's for and an optional note. Evee picks the 3 best frameworks from the built-in library and writes 3 ready-to-film scripts (hook, time-coded beats, CTA, caption, hashtags) plus coaching: which to film first, the angle that matters, what to test, filming tips and one thing to watch out for.
+- **Break down a script** (in Create): paste a draft, a transcript of a video that's selling, or a description. Evee rates the Hook, Pain point, Solution and CTA, explains what's working, and writes a stronger version.
 - **Saved:** scripts you keep, marked To film / Filmed / Posted. Copy, new version, delete.
 - **Frameworks:** the 21 built-in viral frameworks with beats, best uses and Evee's tip. Pick one to write with it.
 - **You:** name, your voice (how you come across, phrases you say, words to avoid), sign out.
@@ -20,7 +21,7 @@ Private beta: invite-only, free.
 | Anthropic Claude (`lib/claude.ts`) | Writes every script and the coaching |
 | `/api/evee` | The only way the app reaches the AI. Prompts live on the server (`lib/studio.ts`). The key never reaches the phone. |
 
-Key files: `lib/library.ts` (the 21 frameworks: add one here), `lib/studio.ts` (everything Evee is told), `app/margo/app.js` (the screens), `supabase/schema.sql` (database). The "What to post today" suggestions are simple rules in `app.js` (`recommendations()`), so they're instant and free.
+Key files: `lib/playbook.ts` (Evee's conversion playbook: Hook → Pain point → Solution → CTA, persuasion principles, pitfalls), `lib/library.ts` (the 21 frameworks: add one here), `lib/studio.ts` (everything Evee is told), `app/margo/app.js` (the screens), `supabase/schema.sql` (database). The "What to post today" suggestions are simple rules in `app.js` (`recommendations()`), so they're instant and free.
 
 ## Setup (one time)
 

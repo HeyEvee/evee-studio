@@ -1,6 +1,7 @@
 // Evee Studio app screens. Plain DOM rendering, mounted by MargoMount.tsx.
 // Data: Supabase "docs" table (private per person). AI: /api/evee (prompts live on the server).
 import { FRAMEWORKS, FW, STYLES, LENGTHS, DEFAULT_VOICE } from "@/lib/library";
+import { SPINE, PRINCIPLES, PITFALLS } from "@/lib/playbook";
 
 export function mount(root, { supabase, email }) {
   const listeners = new AbortController();
@@ -50,6 +51,7 @@ export function mount(root, { supabase, email }) {
     err: "", busy: null,
     product: blankProduct(), opts: { style: "any", length: "medium", framework: "" },
     result: null, open: { 0: true },
+    mode: "write", paste: "", useProduct: false, analysis: null,
     saved: {}, products: [], filter: "", confirmDel: false,
     sales: {}, log: null, // log = { date, rows } while editing
     profile: { name: "", creator: { vibe: DEFAULT_VOICE, phrases: "", avoid: "", identity: "" } },
@@ -293,14 +295,17 @@ export function mount(root, { supabase, email }) {
     if (s.intro) L.push(s.intro, "");
     L.push("HOOK TRIFECTA"); if (s.hook?.say) L.push(`Verbal: "${s.hook.say}"`); if (s.hook?.onScreen) L.push(`Text: ${s.hook.onScreen}`); if (s.hook?.visual) L.push(`Visual: ${s.hook.visual}`); L.push("");
     L.push("SCRIPT");
-    for (const b of arr(s.body)) { if (b.direction) L.push(`(${b.direction})`); if (b.say) L.push(b.say); L.push(""); }
+    let lastPart = "";
+    for (const b of arr(s.body)) { if (b.part && b.part !== lastPart) { L.push(`[${(PART[b.part] || b.part).toUpperCase()}]`); lastPart = b.part; } if (b.direction) L.push(`(${b.direction})`); if (b.say) L.push(b.say); L.push(""); }
     for (const b of arr(s.beats)) { L.push(b.time || ""); if (b.say) L.push(`Say: "${b.say}"`); if (b.show) L.push(`Show: ${b.show}`); if (b.text) L.push(`On screen: ${b.text}`); L.push(""); }
     if (arr(s.ctas).length) { L.push("CTA OPTIONS"); arr(s.ctas).forEach((c, i) => L.push(`${i + 1}. ${c.label ? c.label + ": " : ""}"${c.line}"`)); L.push(""); }
     else if (s.cta) L.push(`CTA: ${s.cta}`, "");
     if (arr(s.altHooks).length) { L.push("ALTERNATIVE HOOKS TO TEST"); arr(s.altHooks).forEach((h, i) => L.push(`${i + 1}. ${[h.say && `Verbal: "${h.say}"`, h.onScreen && `Text: ${h.onScreen}`, h.visual && `Visual: ${h.visual}`].filter(Boolean).join(" / ")}`)); L.push(""); }
+    if (arr(s.breakdown).length) { L.push("WHY THIS CONVERTS"); arr(s.breakdown).forEach((x) => L.push(`- ${x}`)); L.push(""); }
     if (s.caption) L.push(`Caption: ${s.caption} ${tags(s)}`.trim());
     return L.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   }
+  const PART = { hook: "Hook", pain: "Pain point", solution: "Solution", proof: "Proof", cta: "CTA" };
   function trifecta(h, label) {
     return `<div class="hookbox"><span class="label">${label}</span>
       ${h?.say ? `<span class="step ink"><b>Verbal</b><span class="say">“${esc(h.say)}”</span></span>` : ""}
@@ -308,7 +313,7 @@ export function mount(root, { supabase, email }) {
       ${h?.visual ? `<span class="step"><b>Visual</b><span>${esc(h.visual)}</span></span>` : ""}</div>`;
   }
   function scriptCard(s, i, ctx) {
-    const f = FW[s.framework], open = ctx.kind === "saved" || S.open[i];
+    const f = FW[s.framework], open = ctx.kind !== "result" || S.open[i];
     const key = ctx.kind === "saved" ? ctx.id : i;
     const head = `<div class="shead"><span class="chip acc">${esc(f?.name || "Script")}</span>${ctx.kind === "result" ? `<span class="meta">Script ${i + 1}</span>` : ""}</div>
       <h2>${esc(s.title || f?.name)}</h2>
@@ -320,11 +325,12 @@ export function mount(root, { supabase, email }) {
       ${s.intro || s.why ? `<p class="intro">${esc(s.intro || s.why)}</p>` : ""}
       ${trifecta(s.hook, "Hook trifecta")}
       <div><span class="label">Script</span>
-        <div class="body">${arr(s.body).map((b) => `${b.direction ? `<p class="dir">${esc(b.direction)}</p>` : ""}${b.say ? `<p class="line">${esc(b.say)}</p>` : ""}`).join("")}
+        <div class="body">${arr(s.body).map((b, n, all) => `${b.part && b.part !== all[n - 1]?.part ? `<span class="part p-${esc(b.part)}">${esc(PART[b.part] || b.part)}</span>` : ""}${b.direction ? `<p class="dir">${esc(b.direction)}</p>` : ""}${b.say ? `<p class="line">${esc(b.say)}</p>` : ""}`).join("")}
         ${arr(s.beats).map((b) => `<p class="dir">${esc(b.time)}${b.show ? ` · ${esc(b.show)}` : ""}${b.text ? ` · On screen: ${esc(b.text)}` : ""}</p>${b.say ? `<p class="line">${esc(b.say)}</p>` : ""}`).join("")}</div></div>
       ${arr(s.ctas).length ? `<div><span class="label">CTA options</span><ol class="ctas">${arr(s.ctas).map((c) => `<li>${c.label ? `<b>${esc(c.label)}</b>` : ""}<span>“${esc(c.line)}”</span></li>`).join("")}</ol></div>`
         : s.cta ? `<div><span class="label">Call to action</span><p class="ctaline">${esc(s.cta)}</p></div>` : ""}
       ${arr(s.altHooks).length ? `<div class="alts"><span class="label">Alternative hooks to test</span>${arr(s.altHooks).map((h, n) => `<div class="alt"><b>${n + 1}</b><div>${h.say ? `<p class="line">“${esc(h.say)}”</p>` : ""}${h.onScreen ? `<p class="note"><b>Text:</b> ${esc(h.onScreen)}</p>` : ""}${h.visual ? `<p class="note"><b>Visual:</b> ${esc(h.visual)}</p>` : ""}</div></div>`).join("")}</div>` : ""}
+      ${arr(s.breakdown).length ? `<div class="whybox conv"><span class="label">Why this converts</span><ul class="ul">${arr(s.breakdown).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
       ${s.caption ? `<div><span class="label">Caption</span><p>${esc(s.caption)} <span class="meta">${esc(tags(s))}</span></p></div>` : ""}
       ${arr(s.filmTips).length || s.watchOut || s.closer ? `<div class="coachbox"><span class="label">Evee’s coaching</span>
         ${arr(s.filmTips).length ? `<ul class="ul">${arr(s.filmTips).map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
@@ -333,7 +339,8 @@ export function mount(root, { supabase, email }) {
       <div class="btns">
         <button class="btn ghost small" data-copy="${ctx.kind}:${key}">Copy script</button>
         ${ctx.kind === "result" ? (isSaved ? `<button class="btn ghost small" disabled>Saved ✓</button>` : `<button class="btn small" data-save="${i}">Save</button>`) : ""}
-        ${busyIs("remix" + key) ? "" : `<button class="btn ghost small" data-remix="${ctx.kind}:${key}">New version</button>`}
+        ${ctx.kind === "rewrite" ? (S.analysis?.savedId && S.saved[S.analysis.savedId] ? `<button class="btn ghost small" disabled>Saved ✓</button>` : `<button class="btn small" data-act="saverw">Save</button>`) : ""}
+        ${ctx.kind === "rewrite" || busyIs("remix" + key) ? "" : `<button class="btn ghost small" data-remix="${ctx.kind}:${key}">New version</button>`}
       </div>
       ${busyIs("remix" + key) ? busyCard() : ""}
     </div>`;
@@ -343,7 +350,10 @@ export function mount(root, { supabase, email }) {
   function create() {
     const p = S.product, o = S.opts, r = S.result, forced = FW[o.framework];
     const recent = S.products.filter((x) => x.name && norm(x.name) !== norm(p.name)).slice(0, 6);
+    const modeSeg = `<div class="seg modes"><button aria-pressed="${S.mode === "write"}" data-mode="write">Write scripts</button><button aria-pressed="${S.mode === "analyze"}" data-mode="analyze">Break down a script</button></div>`;
+    if (S.mode === "analyze") return analyzeView(modeSeg);
     return `<div class="fade">
+      ${modeSeg}
       <h1>What are you selling?</h1>
       <p class="lede">Evee picks the best viral frameworks for your product and writes 3 ready-to-film scripts with coaching.</p>
       ${recent.length ? `<div class="opts recent">${recent.map((x) => `<button class="opt" data-recent="${esc(x.name)}">${esc(x.name)}</button>`).join("")}</div>` : ""}
@@ -392,6 +402,52 @@ export function mount(root, { supabase, email }) {
     root.querySelector("#results")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /* ================= BREAK DOWN A SCRIPT ================= */
+  const RATE = { strong: ["Strong", "streak"], ok: ["OK", ""], weak: ["Weak", "fix"], missing: ["Missing", "fix"] };
+  function analyzeView(modeSeg) {
+    const a = S.analysis, p = S.product;
+    return `<div class="fade">
+      ${modeSeg}
+      <h1>Break down a script</h1>
+      <p class="lede">Paste your draft, what a creator says in a video that’s selling, or describe the video. Evee shows what’s working through Hook → Pain point → Solution → CTA, then rewrites it to convert better.</p>
+      <section><div class="card">
+        <div class="field"><label for="ax">Script, transcript or description</label><textarea class="big" id="ax" data-bind="paste" placeholder="“Okay nobody told me about this…” or: She opens holding crumbs from her car seat, says…">${esc(S.paste)}</textarea></div>
+        <label class="check"><input type="checkbox" id="ause" data-check="useProduct" ${S.useProduct ? "checked" : ""}> Rewrite it for my product${p.name ? `: <b>${esc(p.name)}</b>` : ""}</label>
+        ${S.useProduct ? `<div class="grid2">
+          <div class="field"><label for="apn">Product</label><input type="text" id="apn" data-bind="product.name" value="${esc(p.name)}"></div>
+          <div class="field"><label for="app">Price</label><input type="text" id="app" data-bind="product.price" value="${esc(p.price)}"></div></div>
+          <div class="field"><label for="apa">Who it’s for</label><input type="text" id="apa" data-bind="product.audience" value="${esc(p.audience)}"></div>` : ""}
+        ${errBox()}
+        ${busyIs("analyze") ? busyCard() : `<button class="btn big" data-act="analyze">Break it down</button>`}
+      </div></section>
+      ${a && !busyIs("analyze") ? `<section id="analysis">
+        <div class="card coach"><span class="label">Evee’s verdict</span><p>${esc(a.verdict)}</p>
+          ${a.frameworkName ? `<p class="note">Closest framework: <b>${esc(FW[a.framework]?.name || a.frameworkName)}</b></p>` : ""}</div>
+        <div class="card"><span class="label">Part by part</span>
+          ${["hook", "pain", "solution", "cta"].map((k) => { const x = a.parts?.[k] || {}, r = RATE[x.rating] || RATE.ok; return `<div class="partrow">
+            <div class="sechead"><b>${PART[k]}</b><span class="chip ${r[1]}">${r[0]}</span></div>
+            ${x.current ? `<p class="quote small">“${esc(x.current)}”</p>` : ""}
+            ${x.why ? `<p class="note">${esc(x.why)}</p>` : ""}
+            ${x.fix && x.rating !== "strong" ? `<p class="fixline"><b>Fix:</b> ${esc(x.fix)}</p>` : ""}</div>`; }).join("")}</div>
+        ${arr(a.whyItWorks).length ? `<div class="card whybox conv"><span class="label">What’s already working</span><ul class="ul">${arr(a.whyItWorks).map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+        <div class="sechead"><h2>The stronger version</h2></div>
+        ${scriptCard(a.rewrite, 0, { kind: "rewrite" })}
+      </section>` : ""}
+    </div>`;
+  }
+  async function doAnalyze() {
+    const text = S.paste.trim();
+    if (text.length < 40) { S.err = "Paste a little more: the script, what they say, or a description of the video."; render(true); return; }
+    const p = S.product, product = S.useProduct ? { name: p.name.trim(), price: p.price.trim(), audience: p.audience.trim(), details: p.details.trim() } : null;
+    if (S.useProduct && !product.name) { S.err = "Add your product name, or untick “Rewrite it for my product.”"; render(true); return; }
+    const out = await ask("analyze", "Evee is breaking it down", { action: "analyze", text, product, opts: { style: S.opts.style, length: S.opts.length } });
+    if (!out) return;
+    S.analysis = { ...out, product, createdAt: new Date().toISOString() };
+    if (product) rememberProduct(product);
+    render(true);
+    root.querySelector("#analysis")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   /* ================= SAVED ================= */
   const STATUS = { idea: "To film", filmed: "Filmed", posted: "Posted" };
   function saved() {
@@ -419,6 +475,11 @@ export function mount(root, { supabase, email }) {
   function frameworks() {
     return `<div class="fade"><h1>Viral frameworks</h1>
       <p class="lede">The ${FRAMEWORKS.length} structures Evee writes with. She picks the best ones for your product, or you can choose one.</p>
+      <section><details class="card fw formula" open><summary><span><b>The conversion formula</b><span class="note">Every script follows Hook → Pain point → Solution → CTA</span></span></summary>
+        ${SPINE.map((p, n) => `<div class="spine"><span class="part p-${p.id}">${n + 1}. ${esc(p.name)}</span><p><b>${esc(p.goal)}</b></p><ul class="ul">${p.how.map((h) => `<li>${esc(h)}</li>`).join("")}</ul></div>`).join("")}
+        <div class="whybox"><span class="label">Persuasion principles Evee uses</span><ul class="ul">${PRINCIPLES.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
+        <div class="whybox"><span class="label">What kills conversions</span><ul class="ul">${PITFALLS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
+      </details></section>
       <section>${FRAMEWORKS.map((f) => `<details class="card fw"><summary><span><b>${esc(f.name)}</b><span class="note">${esc(f.oneLiner)}</span></span></summary>
         <p class="note"><b>Best for:</b> ${esc(f.bestFor)}</p>
         <ol class="ul">${f.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
@@ -451,12 +512,14 @@ export function mount(root, { supabase, email }) {
 
   /* ================= events ================= */
   on("input", (e) => { const b = e.target.dataset?.bind; if (b) setPath(S, b, e.target.value); });
+  on("change", (e) => { const c = e.target.dataset?.check; if (c) { S[c] = e.target.checked; render(true); } });
   on("click", (e) => {
     if (!root.contains(e.target)) return;
-    const el = e.target.closest("[data-go],[data-act],[data-style],[data-length],[data-open],[data-close],[data-save],[data-copy],[data-remix],[data-recent],[data-saved],[data-status],[data-filter],[data-usefw],[data-log],[data-rmrow],[data-write]");
+    const el = e.target.closest("[data-go],[data-act],[data-style],[data-length],[data-open],[data-close],[data-save],[data-copy],[data-remix],[data-recent],[data-saved],[data-status],[data-filter],[data-usefw],[data-log],[data-rmrow],[data-write],[data-mode]");
     if (!el) return; const d = el.dataset;
     if (d.go !== undefined) { if (d.go === "you") push("you"); else go(d.go); return; }
     if (d.log) { openLog(d.log); return; }
+    if (d.mode) { S.mode = d.mode; S.err = ""; render(true); return; }
     if (d.rmrow !== undefined) { S.log.rows.splice(+d.rmrow, 1); render(true); return; }
     if (d.write) { writeFor(d.write); return; }
     if (d.style) { S.opts.style = d.style; render(true); return; }
@@ -474,7 +537,7 @@ export function mount(root, { supabase, email }) {
       const doc = { id, product: clone(S.result.product), opts: clone(S.result.opts), script: sc, status: "idea", createdAt: new Date().toISOString() };
       S.saved[id] = doc; s.savedId = id; persist("k-" + id, doc, "that script"); persist("last", S.result, "your scripts"); toast("Saved"); render(true); return;
     }
-    if (d.copy) { const [kind, k] = d.copy.split(":"); const doc = kind === "saved" ? S.saved[k] : null; const s = doc ? doc.script : S.result?.scripts[+k]; if (s) copy(scriptText(s, doc ? doc.product : S.result.product)); return; }
+    if (d.copy) { const [kind, k] = d.copy.split(":"); if (kind === "rewrite") { if (S.analysis?.rewrite) copy(scriptText(S.analysis.rewrite, S.analysis.product)); return; } const doc = kind === "saved" ? S.saved[k] : null; const s = doc ? doc.script : S.result?.scripts[+k]; if (s) copy(scriptText(s, doc ? doc.product : S.result.product)); return; }
     if (d.remix) {
       const [kind, k] = d.remix.split(":"); const doc = kind === "saved" ? S.saved[k] : null;
       const s = doc ? doc.script : S.result?.scripts[+k]; if (!s) return;
@@ -492,6 +555,10 @@ export function mount(root, { supabase, email }) {
       case "back": back(); break;
       case "stop": S.busy?.ctl.abort(); break;
       case "create": doCreate(); break;
+      case "analyze": doAnalyze(); break;
+      case "saverw": { const a = S.analysis; if (!a?.rewrite) break; const id = uid(); const doc = { id, product: clone(a.product || { name: a.frameworkName ? "Rewritten script" : "Script", price: "", audience: "", details: "" }), opts: { style: S.opts.style, length: S.opts.length }, script: clone(a.rewrite), status: "idea", createdAt: new Date().toISOString() };
+        if (!doc.product.name) doc.product.name = "Rewritten script";
+        S.saved[id] = doc; a.savedId = id; persist("k-" + id, doc, "that script"); toast("Saved"); render(true); break; }
       case "unforce": S.opts.framework = ""; render(true); break;
       case "addrow": S.log.rows.push(blankRow()); render(true); root.querySelector(`#lr${S.log.rows.length - 1}n`)?.focus(); break;
       case "savelog": saveLog(); break;
