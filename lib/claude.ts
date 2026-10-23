@@ -35,9 +35,13 @@ export async function askClaude(prompt: string, opts: { images?: ImageIn[]; maxT
     if (e instanceof MargoError) throw e;
     const status = e?.status as number | undefined;
     if (status === 429) throw new MargoError("busy", "Evee is busy right now. Try again in a minute.", 503);
-    if (status === 400) throw new MargoError("bad_request", "Evee couldn’t read that request. Try shortening the details.", 400);
-    if (status === 401 || status === 403) throw new MargoError("not_configured", "Evee’s AI key isn’t working. Check ANTHROPIC_API_KEY in Vercel.", 503);
-    throw new MargoError("upstream_error", "Evee couldn’t be reached. Try again.", 502);
+    if (status === 400) { const d = String(e?.error?.error?.message || e?.message || "").slice(0, 200); console.error("anthropic 400", d); throw new MargoError("bad_request", `Evee couldn’t read that request (${d}).`, 400); }
+    if (status === 401 || status === 403) throw new MargoError("not_configured", "Evee’s AI key isn’t working. Check ANTHROPIC_API_KEY in Vercel, then redeploy.", 503);
+    const detail = String(e?.error?.error?.message || e?.message || "").slice(0, 200);
+    if (status === 404) throw new MargoError("not_configured", `Evee’s AI model isn’t available to this key (${detail}). Check ANTHROPIC_MODEL in Vercel.`, 503);
+    if (status === 413) throw new MargoError("too_large", "Those screenshots are too big to send at once. Try fewer.", 413);
+    console.error("anthropic error", status, detail);
+    throw new MargoError("upstream_error", `Evee couldn’t be reached${status ? ` (${status}${detail ? ": " + detail : ""})` : ""}. Try again.`, 502);
   }
   const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
   if ((res.stop_reason as string) === "refusal") throw new MargoError("refused", "Evee couldn’t work with that. Try changing the details.", 422);

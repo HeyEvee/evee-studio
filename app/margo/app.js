@@ -107,10 +107,10 @@ export function mount(root, { supabase, email }) {
     const url = URL.createObjectURL(file);
     try {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-      const scale = Math.min(1, 1568 / Math.max(img.naturalWidth, img.naturalHeight));
+      const scale = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
       const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-      return { media_type: "image/jpeg", data: c.toDataURL("image/jpeg", 0.82).split(",")[1] };
+      return { media_type: "image/jpeg", data: c.toDataURL("image/jpeg", 0.78).split(",")[1] };
     } finally { URL.revokeObjectURL(url); }
   }
   async function readScreenshots(files) {
@@ -122,8 +122,18 @@ export function mount(root, { supabase, email }) {
     try { images = await Promise.all(list.map(prepImage)); }
     catch { S.err = "One of those screenshots couldn’t be opened. Try taking it again."; render(true); return; }
     const known = [...new Set([...S.products.map((p) => p.name), ...Object.values(salesByProduct()).map((p) => p.name)])].filter(Boolean);
-    const out = await ask("read", `Evee is reading ${list.length} screenshot${list.length > 1 ? "s" : ""}`, { action: "read", images, today: dayKey(), known });
-    if (!out || !S.log) return;
+    // Send in small batches so each upload stays well under Vercel's size limit.
+    const batches = []; for (let i = 0; i < images.length; i += 3) batches.push(images.slice(i, i + 3));
+    const all = []; let date = null, notes = [];
+    for (let i = 0; i < batches.length; i++) {
+      const label = batches.length > 1 ? `Evee is reading your screenshots (${i + 1} of ${batches.length})` : `Evee is reading ${list.length} screenshot${list.length > 1 ? "s" : ""}`;
+      const part = await ask("read", label, { action: "read", images: batches[i], today: dayKey(), known: [...known, ...all.map((r) => r.name)] });
+      if (!part) { if (!all.length) return; break; }
+      for (const r of arr(part.rows)) { const j = all.findIndex((x) => norm(x.name) === norm(r.name)); if (j < 0) all.push(r); else if (all[j].units == null && r.units != null) all[j] = r; }
+      date = date || part.date; if (part.note) notes.push(part.note);
+    }
+    if (!S.log) return;
+    const out = { rows: all, date, note: notes.join(" ") };
     const typed = L.rows.filter((r) => String(r.name || "").trim());
     const found = arr(out.rows).map((r) => ({ name: r.name, units: r.units ?? "", revenue: r.revenue ?? "" }));
     const keep = typed.filter((r) => !found.some((f) => norm(f.name) === norm(r.name)));
