@@ -52,7 +52,7 @@ export function mount(root, { supabase, email }) {
     result: null, open: { 0: true },
     saved: {}, products: [], filter: "", confirmDel: false,
     sales: {}, log: null, // log = { date, rows } while editing
-    profile: { name: "", creator: { vibe: DEFAULT_VOICE, phrases: "", avoid: "" } },
+    profile: { name: "", creator: { vibe: DEFAULT_VOICE, phrases: "", avoid: "", identity: "" } },
   };
 
   /* ================= data ================= */
@@ -68,7 +68,7 @@ export function mount(root, { supabase, email }) {
     const saved = {}, sales = {};
     for (const row of data || []) {
       const v = row.data || {};
-      if (row.id === "profile") S.profile = { name: String(v.name || ""), creator: { vibe: v.creator?.vibe ?? DEFAULT_VOICE, phrases: v.creator?.phrases || "", avoid: v.creator?.avoid || "" } };
+      if (row.id === "profile") S.profile = { name: String(v.name || ""), creator: { vibe: v.creator?.vibe ?? DEFAULT_VOICE, phrases: v.creator?.phrases || "", avoid: v.creator?.avoid || "", identity: v.creator?.identity || "" } };
       else if (row.id === "products") S.products = arr(v.list);
       else if (row.id === "last" && !S.result && v.scripts) { S.result = v; S.product = { ...blankProduct(), ...(v.product || {}) }; S.opts = { ...S.opts, ...(v.opts || {}), framework: "" }; }
       else if (row.id.startsWith("k-")) saved[row.id.slice(2)] = v;
@@ -100,7 +100,38 @@ export function mount(root, { supabase, email }) {
     finally { S.busy = null; render(true); }
   }
   const busyIs = (w) => S.busy && S.busy.what === w;
-  const busyCard = () => `<div class="card"><div class="thinking"><div class="dots"><i></i><i></i><i></i></div><div><b>${esc(S.busy.label)}</b><p class="note">Usually about 20 seconds.</p></div></div><button class="btn plain" data-act="stop">Stop</button></div>`;
+  // Shrinks a screenshot to at most 1568px on the long side as JPEG, so uploads stay small and fast.
+  async function prepImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const scale = Math.min(1, 1568 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      return { media_type: "image/jpeg", data: c.toDataURL("image/jpeg", 0.82).split(",")[1] };
+    } finally { URL.revokeObjectURL(url); }
+  }
+  async function readScreenshots(files) {
+    const L = S.log; if (!L || !files.length) return;
+    const list = [...files].filter((f) => /^image\//.test(f.type) || /\.(png|jpe?g|heic|webp)$/i.test(f.name)).slice(0, 8);
+    if (!list.length) { S.err = "Pick screenshots (photos), not other files."; render(true); return; }
+    if (files.length > 8) toast("Evee reads up to 8 screenshots at a time. Using the first 8.");
+    let images;
+    try { images = await Promise.all(list.map(prepImage)); }
+    catch { S.err = "One of those screenshots couldn’t be opened. Try taking it again."; render(true); return; }
+    const known = [...new Set([...S.products.map((p) => p.name), ...Object.values(salesByProduct()).map((p) => p.name)])].filter(Boolean);
+    const out = await ask("read", `Evee is reading ${list.length} screenshot${list.length > 1 ? "s" : ""}`, { action: "read", images, today: dayKey(), known });
+    if (!out || !S.log) return;
+    const typed = L.rows.filter((r) => String(r.name || "").trim());
+    const found = arr(out.rows).map((r) => ({ name: r.name, units: r.units ?? "", revenue: r.revenue ?? "" }));
+    const keep = typed.filter((r) => !found.some((f) => norm(f.name) === norm(r.name)));
+    L.rows = [...found, ...keep];
+    if (out.date && out.date !== L.date && !S.sales[out.date]) L.date = out.date;
+    L.read = { count: found.length, note: out.note || "" };
+    render(true);
+    toast(`Found ${found.length} product${found.length === 1 ? "" : "s"}. Check them, then Save.`);
+  }
+  const busyCard = () => `<div class="card"><div class="thinking"><div class="dots"><i></i><i></i><i></i></div><div><b>${esc(S.busy.label)}</b><p class="note">Usually 20–40 seconds.</p></div></div><button class="btn plain" data-act="stop">Stop</button></div>`;
   const errBox = () => (S.err ? `<p class="err">${esc(S.err)}</p>` : "");
 
   /* ================= routing ================= */
@@ -113,6 +144,8 @@ export function mount(root, { supabase, email }) {
     const tabKey = ["today", "create", "saved", "frameworks"].includes(stack[0]) ? stack[0] : "";
     root.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.go === tabKey ? "page" : "false"));
     window.scrollTo(0, keep ? y : 0);
+    const shots = root.querySelector("#shots");
+    if (shots) shots.onchange = () => { const f = [...shots.files]; shots.value = ""; readScreenshots(f); };
   }
 
   /* ================= TODAY: best sellers + what to post ================= */
@@ -166,7 +199,7 @@ export function mount(root, { supabase, email }) {
       <h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>
       ${!logged ? `<section><div class="card logcta">
           <h2>How did yesterday go?</h2>
-          <p class="note">Add your best sellers from ${fmtDay(Y, { weekday: "long" })}. It takes 30 seconds, and Evee tells you what to post today.</p>
+          <p class="note">Add your best sellers from ${fmtDay(Y, { weekday: "long" })}: drop in screenshots or type them. Evee tells you what to post today.</p>
           <button class="btn" data-log="${Y}">Log yesterday’s best sellers</button></div></section>`
         : `<div class="stats">
           <div class="stat"><b>${yUnits.toLocaleString()}</b><span>Sold yesterday</span></div>
@@ -200,7 +233,16 @@ export function mount(root, { supabase, email }) {
     const names = [...new Set([...S.products.map((p) => p.name), ...Object.values(salesByProduct()).map((p) => p.name)])].filter(Boolean);
     return `<div class="fade"><button class="back" data-act="back">← Back</button>
       <h1>Best sellers</h1><p class="date">${fmtDay(L.date)}</p>
+      <section>${busyIs("read") ? busyCard() : `<div class="card shots">
+        <h2>Fill from screenshots</h2>
+        <p class="note">In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales. Add as many screenshots as you need.</p>
+        <label class="drop"><input type="file" id="shots" accept="image/*" multiple>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+          <b>Choose screenshots</b><span class="note">Evee fills in the products and numbers for you</span></label>
+        ${L.read ? `<p class="readok">Evee found ${L.read.count} product${L.read.count === 1 ? "" : "s"}. Check the numbers below, then Save.${L.read.note ? `<br><span class="note">${esc(L.read.note)}</span>` : ""}</p>` : ""}
+      </div>`}</section>
       <section><div class="card">
+        <span class="label">${L.read ? "Check and edit" : "Or type them in"}</span>
         <div class="field"><label for="ld">Day</label><input type="date" id="ld" data-bind="log.date" value="${esc(L.date)}" max="${dayKey()}"></div>
         <datalist id="known">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
         ${L.rows.map((r, i) => `<div class="logrow">
@@ -210,7 +252,7 @@ export function mount(root, { supabase, email }) {
           ${L.rows.length > 1 ? `<button class="x" data-rmrow="${i}" aria-label="Remove row">×</button>` : `<span></span>`}
         </div>`).join("")}
         <button class="btn ghost small" data-act="addrow">+ Add product</button>
-        <p class="note">Find these in TikTok Shop → Creator Center → Analytics. Units sold matters most; sales $ is optional.</p>
+        <p class="note">Units sold matters most; sales $ is optional.</p>
         ${errBox()}
         <button class="btn" data-act="savelog">Save</button>
         ${S.sales[L.orig] ? `<button class="btn plain" data-act="dellog">Delete this day</button>` : ""}
@@ -244,14 +286,26 @@ export function mount(root, { supabase, email }) {
   }
 
   /* ================= script card ================= */
+  const tags = (s) => arr(s.hashtags).map((h) => (String(h).startsWith("#") ? h : "#" + h)).join(" ");
   function scriptText(s, p) {
     const f = FW[s.framework], L = [];
     L.push(`${s.title || f?.name || "Script"}${p?.name ? ` · ${p.name}` : ""}`, f ? `Framework: ${f.name}` : "", "");
-    L.push("HOOK"); if (s.hook?.say) L.push(`Say: "${s.hook.say}"`); if (s.hook?.onScreen) L.push(`On screen: ${s.hook.onScreen}`); if (s.hook?.visual) L.push(`Show: ${s.hook.visual}`); L.push("");
+    if (s.intro) L.push(s.intro, "");
+    L.push("HOOK TRIFECTA"); if (s.hook?.say) L.push(`Verbal: "${s.hook.say}"`); if (s.hook?.onScreen) L.push(`Text: ${s.hook.onScreen}`); if (s.hook?.visual) L.push(`Visual: ${s.hook.visual}`); L.push("");
+    L.push("SCRIPT");
+    for (const b of arr(s.body)) { if (b.direction) L.push(`(${b.direction})`); if (b.say) L.push(b.say); L.push(""); }
     for (const b of arr(s.beats)) { L.push(b.time || ""); if (b.say) L.push(`Say: "${b.say}"`); if (b.show) L.push(`Show: ${b.show}`); if (b.text) L.push(`On screen: ${b.text}`); L.push(""); }
-    if (s.cta) L.push(`CTA: ${s.cta}`, "");
-    if (s.caption) L.push(`Caption: ${s.caption}${arr(s.hashtags).length ? " " + arr(s.hashtags).map((h) => (String(h).startsWith("#") ? h : "#" + h)).join(" ") : ""}`);
+    if (arr(s.ctas).length) { L.push("CTA OPTIONS"); arr(s.ctas).forEach((c, i) => L.push(`${i + 1}. ${c.label ? c.label + ": " : ""}"${c.line}"`)); L.push(""); }
+    else if (s.cta) L.push(`CTA: ${s.cta}`, "");
+    if (arr(s.altHooks).length) { L.push("ALTERNATIVE HOOKS TO TEST"); arr(s.altHooks).forEach((h, i) => L.push(`${i + 1}. ${[h.say && `Verbal: "${h.say}"`, h.onScreen && `Text: ${h.onScreen}`, h.visual && `Visual: ${h.visual}`].filter(Boolean).join(" / ")}`)); L.push(""); }
+    if (s.caption) L.push(`Caption: ${s.caption} ${tags(s)}`.trim());
     return L.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  function trifecta(h, label) {
+    return `<div class="hookbox"><span class="label">${label}</span>
+      ${h?.say ? `<span class="step ink"><b>Verbal</b><span class="say">“${esc(h.say)}”</span></span>` : ""}
+      ${h?.onScreen ? `<span class="step ink"><b>Text</b><span>${esc(h.onScreen)}</span></span>` : ""}
+      ${h?.visual ? `<span class="step"><b>Visual</b><span>${esc(h.visual)}</span></span>` : ""}</div>`;
   }
   function scriptCard(s, i, ctx) {
     const f = FW[s.framework], open = ctx.kind === "saved" || S.open[i];
@@ -263,20 +317,19 @@ export function mount(root, { supabase, email }) {
     const isSaved = ctx.kind === "result" && s.savedId && S.saved[s.savedId];
     return `<div class="card scard">
       ${ctx.kind === "result" ? `<button class="sclose" data-close="${i}" aria-label="Collapse">${head}</button>` : head}
-      ${s.why ? `<p class="why">${esc(s.why)}</p>` : ""}
-      <div class="hookbox"><span class="label">Hook · first second</span>
-        ${s.hook?.say ? `<span class="step ink"><b>Say</b><span class="say">${esc(s.hook.say)}</span></span>` : ""}
-        ${s.hook?.onScreen ? `<span class="step ink"><b>On screen</b><span>${esc(s.hook.onScreen)}</span></span>` : ""}
-        ${s.hook?.visual ? `<span class="step"><b>Show</b><span>${esc(s.hook.visual)}</span></span>` : ""}</div>
-      <div class="beats">${arr(s.beats).map((b) => `<div class="scene"><span class="tc">${esc(b.time)}</span><div class="body">
-        ${b.say ? `<span class="say">“${esc(b.say)}”</span>` : ""}
-        ${b.show ? `<span class="step"><b>Show</b><span>${esc(b.show)}</span></span>` : ""}
-        ${b.text ? `<span class="step"><b>On screen</b><span>${esc(b.text)}</span></span>` : ""}</div></div>`).join("")}</div>
-      ${s.cta ? `<div><span class="label">Call to action</span><p class="ctaline">${esc(s.cta)}</p></div>` : ""}
-      ${s.caption ? `<div><span class="label">Caption</span><p>${esc(s.caption)} <span class="meta">${arr(s.hashtags).map((h) => esc(String(h).startsWith("#") ? h : "#" + h)).join(" ")}</span></p></div>` : ""}
-      ${arr(s.filmTips).length || s.watchOut ? `<div class="coachbox"><span class="label">Evee’s coaching</span>
+      ${s.intro || s.why ? `<p class="intro">${esc(s.intro || s.why)}</p>` : ""}
+      ${trifecta(s.hook, "Hook trifecta")}
+      <div><span class="label">Script</span>
+        <div class="body">${arr(s.body).map((b) => `${b.direction ? `<p class="dir">${esc(b.direction)}</p>` : ""}${b.say ? `<p class="line">${esc(b.say)}</p>` : ""}`).join("")}
+        ${arr(s.beats).map((b) => `<p class="dir">${esc(b.time)}${b.show ? ` · ${esc(b.show)}` : ""}${b.text ? ` · On screen: ${esc(b.text)}` : ""}</p>${b.say ? `<p class="line">${esc(b.say)}</p>` : ""}`).join("")}</div></div>
+      ${arr(s.ctas).length ? `<div><span class="label">CTA options</span><ol class="ctas">${arr(s.ctas).map((c) => `<li>${c.label ? `<b>${esc(c.label)}</b>` : ""}<span>“${esc(c.line)}”</span></li>`).join("")}</ol></div>`
+        : s.cta ? `<div><span class="label">Call to action</span><p class="ctaline">${esc(s.cta)}</p></div>` : ""}
+      ${arr(s.altHooks).length ? `<div class="alts"><span class="label">Alternative hooks to test</span>${arr(s.altHooks).map((h, n) => `<div class="alt"><b>${n + 1}</b><div>${h.say ? `<p class="line">“${esc(h.say)}”</p>` : ""}${h.onScreen ? `<p class="note"><b>Text:</b> ${esc(h.onScreen)}</p>` : ""}${h.visual ? `<p class="note"><b>Visual:</b> ${esc(h.visual)}</p>` : ""}</div></div>`).join("")}</div>` : ""}
+      ${s.caption ? `<div><span class="label">Caption</span><p>${esc(s.caption)} <span class="meta">${esc(tags(s))}</span></p></div>` : ""}
+      ${arr(s.filmTips).length || s.watchOut || s.closer ? `<div class="coachbox"><span class="label">Evee’s coaching</span>
         ${arr(s.filmTips).length ? `<ul class="ul">${arr(s.filmTips).map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
-        ${s.watchOut ? `<p class="flag"><b>Watch out:</b> ${esc(s.watchOut)}</p>` : ""}</div>` : ""}
+        ${s.watchOut ? `<p class="flag"><b>Watch out:</b> ${esc(s.watchOut)}</p>` : ""}
+        ${s.closer ? `<p class="closer">${esc(s.closer)}</p>` : ""}</div>` : ""}
       <div class="btns">
         <button class="btn ghost small" data-copy="${ctx.kind}:${key}">Copy script</button>
         ${ctx.kind === "result" ? (isSaved ? `<button class="btn ghost small" disabled>Saved ✓</button>` : `<button class="btn small" data-save="${i}">Save</button>`) : ""}
@@ -384,6 +437,8 @@ export function mount(root, { supabase, email }) {
         <div class="field"><label for="yv">How you come across</label><textarea id="yv" data-bind="profile.creator.vibe">${esc(c.vibe)}</textarea></div>
         <div class="field"><label for="yp">Phrases you actually say <span class="hint">· optional</span></label><textarea id="yp" data-bind="profile.creator.phrases" placeholder="“Okay wait.” “Run, don’t walk.”">${esc(c.phrases)}</textarea></div>
         <div class="field"><label for="ya">Words to never use <span class="hint">· optional</span></label><input type="text" id="ya" data-bind="profile.creator.avoid" value="${esc(c.avoid)}" placeholder="obsessed, game-changer"></div>
+        <div class="field"><label for="yi">Your community or background <span class="hint">· optional</span></label><input type="text" id="yi" data-bind="profile.creator.identity" value="${esc(c.identity || "")}" placeholder="e.g. Black mom of four, hairstylist, nurse">
+          <span class="hint">Only used for Cultural Insider scripts, so they speak from your own experience.</span></div>
         <button class="btn" data-act="saveprofile">Save</button>
         <p class="note">Evee uses this to make every script sound like you.</p>
       </div></section>

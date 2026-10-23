@@ -15,9 +15,22 @@ export const FRAMEWORKS: Framework[] = [
   { id: "problem-solution", name: "Relatable Problem → Fix", oneLiner: "Show a frustration everyone knows, then fix it on camera.",
     bestFor: "Products that solve an everyday annoyance", steps: ["Hook: the frustration, shown not told", "“Same?” moment that makes them feel seen", "Product enters as the fix", "Fix it on camera", "Show the payoff", "CTA"],
     coach: "Make the problem specific and visual in the first second. “Crumbs in the car seat” beats “messy car.”" },
-  { id: "nobody-told-me", name: "Nobody Told Me", oneLiner: "Insider-secret hook that makes viewers feel let in on something.",
-    bestFor: "Clever products people don’t know exist yet", steps: ["“Nobody told me about this…” lean-in hook", "The situation it changed for you", "Reveal the product", "Show it working", "Your honest take", "CTA"],
-    coach: "Lean into the camera and lower your voice slightly. It should feel like a secret between friends.", caution: "No fake “secret” claims or invented traditions." },
+  { id: "nobody-told-me", name: "Cultural Insider: Ungate the Secret", oneLiner: "Share insider wisdom from your own community like a secret being passed down.",
+    bestFor: "Personal care, fashion, shapewear and hair, especially awkward or personal topics", steps: ["Identity or insider hook (“In case nobody told you…”)", "The relatable struggle, shown on camera", "“This has been passed down…” as you reveal the product", "Demonstrate what it actually does", "Confidence payoff (“That’s the secret.”)", "CTA"],
+    coach: "It turns an awkward topic into wisdom being handed down, so the reveal feels like a gift, not a pitch. Speak from your own community and experience only.",
+    caution: "Only use a cultural or identity angle that’s genuinely yours. Never imply everyone in a group shares one experience." },
+  { id: "authority-transformation", name: "Before/After with Authority", oneLiner: "Dramatic visual transformation, credible because you explain why it works.",
+    bestFor: "Beauty tools, hair tools and anything where expertise builds trust", steps: ["Problem visual + a 2-second flash of the finished result", "Your credibility (job, years of experience, or real use) in one line", "Show the product working, explaining the why", "Second angle of the result", "Final reveal", "CTA"],
+    coach: "Flash the finished result in the first 2 seconds, then cut back to the “before.” Viewers stay to see how you got there.",
+    caution: "Only claim expertise you actually have. Show the result, don’t promise one." },
+  { id: "result-first", name: "Result First, Product Hidden", oneLiner: "Lead with the before/after result and keep the product name back until it’s earned.",
+    bestFor: "Products people don’t understand yet: wellness, gadgets, anything new", steps: ["Split-screen before/after, no product visible", "Name the problem the viewer feels", "Reveal the product (label turned away at first)", "Show how you use it, in seconds", "What changed for you", "CTA"],
+    coach: "Curiosity does the work. Don’t say the product name until the viewer is already asking “what is that?”",
+    caution: "No medical or health claims. Describe your own experience in your own words, and only if it’s real." },
+  { id: "two-person-ambush", name: "Friend Ambush", oneLiner: "A friend or sister pops into frame and calls you out, then you deliver the proof.",
+    bestFor: "Products that need explaining, made casual and fun by a second person", steps: ["Friend pops in: “She has something to tell you, so listen”", "You: “Don’t scroll.” Hold a beat", "The problem, with the friend reacting in the background", "Product to camera, label forward", "The one detail that makes it different", "Both point at the cart for the CTA"],
+    coach: "The comedic second person makes it impossible to scroll past. Keep the friend’s reactions small and quick in the background.",
+    caution: "Scripted, but every claim still has to be true." },
   { id: "demo-first", name: "Demo First", oneLiner: "Open on the most satisfying moment of the product working.",
     bestFor: "Gadgets, cleaning, kitchen and anything visually satisfying", steps: ["Open mid-action on the best visual", "Say what they’re looking at", "One key feature", "Show it again from a new angle", "CTA"],
     coach: "Your first frame should be the best frame. Cut everything before the product is doing its thing." },
@@ -67,5 +80,7 @@ export const STYLES: Record<string, string> = {
   silent: "No talking (music + text)",
 };
 export const LENGTHS: Record<string, string> = { short: "7–15 sec", medium: "15–30 sec", long: "30–60 sec" };
+
+export const TWO_PERSON = new Set(["two-person-ambush"]);
 
 export const DEFAULT_VOICE = "Authentic and conversational, like a helpful friend. Confident but never pushy. Comfortable with humor and real reactions. Never sounds like a commercial.";
