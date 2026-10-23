@@ -122,13 +122,14 @@ export function mount(root, { supabase, email }) {
     too_large: "That’s too much at once. Use fewer screenshots or shorten what you pasted.",
     invalid_json: "Evee’s answer came back garbled. Try again.",
     offline: "You’re offline. Evee needs a connection.",
+    timeout: "Evee ran out of time on that one. Tap Try again.",
   };
   async function callAI(action, data, signal, path = "/api/ai") {
     let r;
     try { r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(path === "/api/ai" ? { action, data } : data), signal }); }
     catch (e) { if (e?.name === "AbortError") throw { code: "cancelled" }; throw { code: "offline" }; }
     let j = null; try { j = await r.json(); } catch {}
-    if (!r.ok) throw { code: j?.code || (r.status === 401 ? "unauthorized" : r.status === 413 ? "too_large" : "upstream_error"), message: j?.message };
+    if (!r.ok) throw { code: j?.code || (r.status === 401 ? "unauthorized" : r.status === 413 ? "too_large" : r.status === 504 ? "timeout" : "upstream_error"), message: j?.message };
     return j?.result;
   }
   async function ask(what, label, action, data) {

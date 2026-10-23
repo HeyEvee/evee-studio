@@ -90,15 +90,28 @@ export async function watchVideo(bytes: ArrayBuffer, mime: string, prompt: strin
     if (bytes.byteLength <= INLINE_MAX) inline = { mime: vMime, data: Buffer.from(bytes).toString("base64") };
     else uploaded = await uploadFile(bytes, vMime);
 
+    // Try the current API first, then the older one. Keep Google's own error so we can show it.
+    const errors: string[] = [];
+    const readErr = async (r: Response) => { const t = await r.text().catch(() => ""); let m = t; try { m = JSON.parse(t)?.error?.message || t; } catch {} return `${r.status} ${String(m).slice(0, 240)}`; };
     let res = await interactions(inline ? { data: inline.data, mime_type: vMime } : { uri: uploaded!.uri, mime_type: vMime }, prompt);
-    // Older API shape as a fallback.
-    if (res.status === 404 || res.status === 400) res = await generateContent(inline ? { inline } : { file: { mime: vMime, uri: uploaded!.uri } }, prompt);
-    if (res.status === 401 || res.status === 403) throw new MargoError("not_configured", "The video key isn’t working. Check GEMINI_API_KEY in Vercel.", 503);
-    if (res.status === 429) throw new MargoError("busy", "Evee is busy watching other videos. Try again in a minute.", 503);
-    const j = await res.json().catch(() => null);
-    if (!res.ok || !j) {
-      console.error("gemini error", res.status, JSON.stringify(j)?.slice(0, 500));
-      throw new MargoError("upstream_error", "Evee couldn’t watch that video. Try again.", 502);
+    let j: any = null;
+    if (res.ok) j = await res.json().catch(() => null);
+    else errors.push("new API: " + (await readErr(res)));
+    if (!j || !textOf(j).trim()) {
+      const r2 = await generateContent(inline ? { inline } : { file: { mime: vMime, uri: uploaded!.uri } }, prompt);
+      if (r2.ok) { j = await r2.json().catch(() => null); res = r2; }
+      else { errors.push("classic API: " + (await readErr(r2))); res = r2; j = null; }
+    }
+    if (!j) {
+      const all = errors.join(" | ");
+      console.error("gemini error", all);
+      if (/api key not valid|API_KEY_INVALID|permission|PERMISSION_DENIED|unauthenticated/i.test(all) || res.status === 401 || res.status === 403)
+        throw new MargoError("not_configured", `Google rejected the video key. Check GEMINI_API_KEY in Vercel, then redeploy. (Google said: ${errors[errors.length - 1]})`, 503);
+      if (/billing|quota|RESOURCE_EXHAUSTED/i.test(all) || res.status === 429)
+        throw new MargoError("busy", `Google’s limit or billing stopped this. Check billing is on for your Google AI key. (Google said: ${errors[errors.length - 1]})`, 503);
+      if (/not found|is not supported|NOT_FOUND/i.test(all))
+        throw new MargoError("upstream_error", `That Gemini model isn’t available to your key. (Google said: ${errors[errors.length - 1]})`, 502);
+      throw new MargoError("upstream_error", `Evee couldn’t watch that video. (Google said: ${errors.join(" | ").slice(0, 400)})`, 502);
     }
     const parsed = parseJson(textOf(j));
     if (!parsed || typeof parsed !== "object") throw new MargoError("invalid_json", "Evee’s notes on that video came back garbled. Try again.", 502);
