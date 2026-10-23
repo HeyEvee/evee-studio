@@ -27,7 +27,7 @@ const productText = (p: Product) =>
 
 const libText = (ids?: string[]) =>
   FRAMEWORKS.filter((f) => !ids || ids.includes(f.id))
-    .map((f) => `- ${f.id}: ${f.name}. ${f.oneLiner} Best for: ${f.bestFor}. Beats: ${f.steps.join(" → ")}.${f.caution ? " " + f.caution : ""}`)
+    .map((f) => `- ${f.id}: ${f.name}. ${f.oneLiner} Best for: ${f.bestFor}. Beats: ${f.steps.join(" → ")}.${f.why ? ` Why it works: ${f.why.join(" ")}` : ""}${f.caution ? " " + f.caution : ""}`)
     .join("\n");
 
 const SCRIPT_SHAPE = `{"framework":"id from the library","title":"short name for this version","intro":"2 sentences in Evee's voice: which framework this is and why it fits THIS product and audience","hook":{"say":"verbal hook, or null if no talking","onScreen":"text hook overlay, or null","visual":"visual hook: exactly what the camera shows in the first 2 seconds"},"body":[{"direction":"filming/stage direction, e.g. Hold up the product, label forward","say":"what she says here, conversational, or null"}],"ctas":[{"label":"e.g. Confidence / Practical / Urgency","line":"the CTA line"}],"altHooks":[{"say":"","onScreen":"","visual":""}],"caption":"","hashtags":["max 4"],"filmTips":["2 or 3 short, concrete tips"],"watchOut":"one honest mistake to avoid","closer":"one short line in Evee's voice, e.g. why this one will stop the scroll"}`;

@@ -9,6 +9,7 @@ export type Framework = {
   steps: string[];    // the beats, in order
   coach: string;      // Evee's tip for pulling it off
   caution?: string;   // honesty guardrail
+  why?: string[];     // why it works: the psychology behind each beat
 };
 
 export const FRAMEWORKS: Framework[] = [
@@ -27,10 +28,25 @@ export const FRAMEWORKS: Framework[] = [
     bestFor: "Products people don’t understand yet: wellness, gadgets, anything new", steps: ["Split-screen before/after, no product visible", "Name the problem the viewer feels", "Reveal the product (label turned away at first)", "Show how you use it, in seconds", "What changed for you", "CTA"],
     coach: "Curiosity does the work. Don’t say the product name until the viewer is already asking “what is that?”",
     caution: "No medical or health claims. Describe your own experience in your own words, and only if it’s real." },
-  { id: "two-person-ambush", name: "Friend Ambush", oneLiner: "A friend or sister pops into frame and calls you out, then you deliver the proof.",
-    bestFor: "Products that need explaining, made casual and fun by a second person", steps: ["Friend pops in: “She has something to tell you, so listen”", "You: “Don’t scroll.” Hold a beat", "The problem, with the friend reacting in the background", "Product to camera, label forward", "The one detail that makes it different", "Both point at the cart for the CTA"],
-    coach: "The comedic second person makes it impossible to scroll past. Keep the friend’s reactions small and quick in the background.",
-    caution: "Scripted, but every claim still has to be true." },
+  { id: "two-person-ambush", name: "Sister Ambush Social Proof Reveal", oneLiner: "A sister or friend pops into frame and calls you out, then you deliver the proof.",
+    bestFor: "Products that need explaining (supplements, skincare, anything technical), made casual by a second person", steps: ["Sister pops in: “This is my sister and she has something to say, so listen”", "You: “Don’t you scroll.” Hold a beat", "The problem, with your sister miming it in the background", "Proof inserts (before photo, ingredient or feature graphic) right when doubt peaks", "Product to camera, label forward, and the one detail that makes it different", "Both point at the cart for the CTA"],
+    coach: "The comedic second person makes it impossible to scroll past. Keep her reactions small and quick in the background so it holds attention without cuts.",
+    caution: "Scripted, but every claim still has to be true. Urgency only if it’s real (“if the orange cart is still there”).",
+    why: ["A third person introducing you makes viewers pause before they can justify scrolling.", "“Don’t you scroll” calls out the exit behavior directly, creating a commitment loop in the first 3 seconds.", "The sister miming the problem adds a second layer of visual story that holds attention without cuts.", "Proof inserts land at the exact moment skepticism peaks.", "A playful warning and price framing at the close turn hesitation into action."] },
+  { id: "budget-luxury", name: "Aspirational Budget Luxury", oneLiner: "Open with an aspirational identity, show it looks high-end, then reveal the real price.",
+    bestFor: "Fashion, outerwear, accessories and home pieces that look more expensive than they are", steps: ["Aspirational identity hook (“If you want to look like ___ this season…”)", "Show the full look on you", "Quality proof up close: lining, stitching, pockets, back detail", "A real moment you’d wear or use it ([your real occasion])", "The price reveal, framed against how expensive it looks", "Close with your size and height so viewers know what to order"],
+    coach: "Let the viewer imagine themselves in it before any price shows. The close-up quality details are what make the price feel like a steal.",
+    caution: "Compare to how it looks (“looks designer”), never claim a fake original price or that it’s a specific designer item.",
+    why: ["An aspirational identity makes viewers picture themselves in it before they see a price.", "Framing it against how expensive it looks makes the real price feel like a steal.", "Close-ups of lining and details let viewers inspect it like they’re in the store.", "A real occasion makes it feel like lifestyle, not a sales pitch.", "Your size and height remove the last “will it fit me?” hesitation."] },
+  { id: "comfort-confession", name: "Unapologetic Comfort Confession", oneLiner: "Say the “embarrassing” want out loud, then demo it on your body, live.",
+    bestFor: "Shapewear, underwear, loungewear, comfort products, anything people feel a little shy wanting", steps: ["Confession hook: name the desire people don’t say out loud (“If you want ___ and don’t care if it looks like ___, I got you”)", "Give permission: function over looks", "Live demo on your body, no outfit change", "A spend comparison from your own experience ([what you spent on things that didn’t work])", "Close with your size and how it fits"],
+    coach: "Say the “shameful” part with a straight face and zero apology. That honesty is what builds trust in the first 3 seconds.",
+    caution: "Your own size, fit and experience only. No body-shaming of anyone, including yourself.",
+    why: ["Naming the “embarrassing” desire out loud releases viewer judgment and builds instant trust.", "Framing it as permission to choose comfort disarms comparison-shopping.", "A live demo on the body closes the gap between seeing and believing.", "A spend comparison triggers loss aversion without leading with price.", "Your exact size turns sizing into a clear signal for viewers built like you."] },
+  { id: "problem-solved-reveal", name: "Problem-Solved Feature Reveal", oneLiner: "Name the flaw everyone hates in this kind of product, then show how this one fixes it.",
+    bestFor: "Upgraded versions of everyday products: tights, leggings, bras, tools, kitchen gear", steps: ["Hook naming the common flaw (“___ got an upgrade: instead of ___, you get ___”)", "Lead with a product-first shot (e.g. back view) so viewers lean in", "Old problem → the new solution", "Personal proof while you physically demo: pull, point, trace", "Lifestyle: how it fits into a normal day", "Close with a “you’d never know” line that answers the main objection"],
+    coach: "Point at and physically show the fix while you talk about it. Showing and telling at the same time is what keeps people watching.",
+    why: ["Naming a flaw everyone has felt makes viewers feel understood before the pitch starts.", "A product-first shot makes viewers lean in to figure out what they’re looking at.", "Old problem → new solution → personal proof → lifestyle feels like advice, not advertising.", "Physical demonstration (pulling, pointing, tracing) shows and tells at once.", "A “you’d never know” close answers the #1 objection without calling it one."] },
   { id: "demo-first", name: "Demo First", oneLiner: "Open on the most satisfying moment of the product working.",
     bestFor: "Gadgets, cleaning, kitchen and anything visually satisfying", steps: ["Open mid-action on the best visual", "Say what they’re looking at", "One key feature", "Show it again from a new angle", "CTA"],
     coach: "Your first frame should be the best frame. Cut everything before the product is doing its thing." },

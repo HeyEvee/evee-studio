@@ -265,3 +265,5 @@ details.fw .btn{justify-self:start}
 .alt p{margin:0}
 .alt .line{font-size:15px}
 .closer{margin:0;font-weight:600;font-size:14px}
+.whybox{background:var(--bg);border-radius:12px;padding:12px;display:grid;gap:6px}
+.whybox .ul{font-size:14px}

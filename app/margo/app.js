@@ -422,6 +422,7 @@ export function mount(root, { supabase, email }) {
       <section>${FRAMEWORKS.map((f) => `<details class="card fw"><summary><span><b>${esc(f.name)}</b><span class="note">${esc(f.oneLiner)}</span></span></summary>
         <p class="note"><b>Best for:</b> ${esc(f.bestFor)}</p>
         <ol class="ul">${f.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+        ${f.why ? `<div class="whybox"><span class="label">Why it works</span><ul class="ul">${f.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
         <p class="coachline"><b>Evee’s tip:</b> ${esc(f.coach)}</p>
         ${f.caution ? `<p class="flag note">${esc(f.caution)}</p>` : ""}
         <button class="btn ghost small" data-usefw="${f.id}">Write scripts with this</button></details>`).join("")}</section>
