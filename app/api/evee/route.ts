@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       await spendAllowance(supabase, "read");
       const out: any = await askClaude(readSalesPrompt(today, known), { images, json: true, maxTokens: 2500 });
       const n = (v: unknown) => (typeof v === "number" && isFinite(v) && v >= 0 ? v : null);
-      const rows = (Array.isArray(out?.rows) ? out.rows : []).map((r: any) => ({ name: str(r?.name, 120), units: n(r?.units), revenue: n(r?.revenue) })).filter((r: any) => r.name).slice(0, 40);
+      const rows = (Array.isArray(out?.rows) ? out.rows : []).map((r: any) => ({ name: str(r?.name, 120), units: n(r?.units), revenue: n(r?.revenue), videos: n(r?.videos) })).filter((r: any) => r.name).slice(0, 40);
       if (!rows.length) throw new MargoError("nothing_found", "Evee couldn’t find any products in those screenshots. Try a clearer screenshot of your product sales.", 422);
       const date = typeof out?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(out.date) && out.date <= today ? out.date : null;
       return NextResponse.json({ result: { date, rows, note: typeof out?.note === "string" ? out.note.slice(0, 300) : null } });

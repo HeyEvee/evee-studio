@@ -16,7 +16,7 @@ export function mount(root, { supabase, email }) {
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
   <nav class="tabs" aria-label="Main">
-    <button class="tab" data-go="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Today</button>
+    <button class="tab" data-go="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>Home</button>
     <button class="tab" data-go="create"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Create</button>
     <button class="tab" data-go="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg>Saved</button>
     <button class="tab" data-go="frameworks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Frameworks</button>
@@ -42,7 +42,7 @@ export function mount(root, { supabase, email }) {
   function toast(msg) { const t = root.querySelector("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 2400); }
   function copy(text) { try { navigator.clipboard.writeText(text).then(() => toast("Copied"), () => toast("Couldn’t copy. Press and hold the text to copy it.")); } catch { toast("Couldn’t copy. Press and hold the text to copy it."); } }
   const blankProduct = () => ({ name: "", price: "", audience: "", details: "" });
-  const blankRow = () => ({ name: "", units: "", revenue: "" });
+  const blankRow = () => ({ name: "", units: "", revenue: "", videos: "" });
 
   /* ================= state ================= */
   let stack = ["today"];
@@ -55,6 +55,7 @@ export function mount(root, { supabase, email }) {
     saved: {}, products: [], filter: "", confirmDel: false,
     sales: {}, log: null, // log = { date, rows } while editing
     perfDraft: null,
+    vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
     profile: { name: "", creator: { vibe: DEFAULT_VOICE, phrases: "", avoid: "", identity: "" } },
   };
 
@@ -76,6 +77,7 @@ export function mount(root, { supabase, email }) {
       else if (row.id === "last" && !S.result && v.scripts) { S.result = v; S.product = { ...blankProduct(), ...(v.product || {}) }; S.opts = { ...S.opts, ...(v.opts || {}), framework: "" }; }
       else if (row.id.startsWith("k-")) saved[row.id.slice(2)] = v;
       else if (row.id.startsWith("sales-")) sales[row.id.slice(6)] = v;
+      else if (row.id === "videos") S.vids = v.counts && typeof v.counts === "object" ? v.counts : {};
     }
     S.saved = saved; S.sales = sales; ready = true;
     if (!S.busy && !document.activeElement?.matches("input,textarea,select")) render(true);
@@ -136,7 +138,7 @@ export function mount(root, { supabase, email }) {
     if (!S.log) return;
     const out = { rows: all, date, note: notes.join(" ") };
     const typed = L.rows.filter((r) => String(r.name || "").trim());
-    const found = arr(out.rows).map((r) => ({ name: r.name, units: r.units ?? "", revenue: r.revenue ?? "" }));
+    const found = arr(out.rows).map((r) => ({ name: r.name, units: r.units ?? "", revenue: r.revenue ?? "", videos: r.videos ?? "" }));
     const keep = typed.filter((r) => !found.some((f) => norm(f.name) === norm(r.name)));
     L.rows = [...found, ...keep];
     if (out.date && out.date !== L.date && !S.sales[out.date]) L.date = out.date;
@@ -153,7 +155,7 @@ export function mount(root, { supabase, email }) {
   function back() { stack.pop(); if (!stack.length) stack = ["today"]; S.err = ""; S.confirmDel = false; render(); }
   function render(keep) {
     const y = window.scrollY, cur = stack[stack.length - 1];
-    view.innerHTML = cur.startsWith("k:") ? savedView(cur.slice(2)) : cur === "log" ? logView() : ({ today, create, saved, frameworks, you }[cur] || today)();
+    view.innerHTML = cur.startsWith("k:") ? savedView(cur.slice(2)) : cur.startsWith("p:") ? productView(cur.slice(2)) : cur === "log" ? logView() : ({ today, create, saved, frameworks, you }[cur] || today)();
     const tabKey = ["today", "create", "saved", "frameworks"].includes(stack[0]) ? stack[0] : "";
     root.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.go === tabKey ? "page" : "false"));
     window.scrollTo(0, keep ? y : 0);
@@ -201,55 +203,144 @@ export function mount(root, { supabase, email }) {
     const max = Math.max(1, ...vals);
     return `<span class="spark" aria-hidden="true">${vals.map((v, i) => `<i style="height:${Math.max(6, Math.round((v / max) * 100))}%" class="${i === vals.length - 1 ? "last" : ""}${v ? "" : " zero"}"></i>`).join("")}</span>`;
   }
+  /* ---------- planner: periods, per-product stats, videos ---------- */
+  const PERIODS = { "1d": ["Yesterday", 1, "vs the day before"], "7d": ["7 days", 7, "vs the 7 days before"], "30d": ["30 days", 30, "vs the 30 days before"] };
+  const periodDays = (per, back = 0) => { const n = PERIODS[per][1], Y = yesterday(); return [...Array(n)].map((_, i) => addDays(Y, -(back * n) - i)); };
+  const vidsOn = (d, k) => num(S.vids[d]?.[k]) || 0;
+  const nameFor = (k) => S.products.find((p) => norm(p.name) === k)?.name || salesByProduct()[k]?.name || k;
+  function productStats(days) {
+    const P = salesByProduct(), keys = new Set(Object.keys(P)), out = {};
+    for (const d of days) for (const k of Object.keys(S.vids[d] || {})) keys.add(k);
+    for (const k of keys) {
+      const p = P[k] || { name: nameFor(k), byDay: {}, rev: {} };
+      let units = 0, gmv = 0, hasG = false, videos = 0;
+      for (const d of days) { units += p.byDay[d] || 0; if (p.rev[d] != null) { gmv += p.rev[d]; hasG = true; } videos += vidsOn(d, k); }
+      out[k] = { key: k, name: p.name, units, gmv: hasG ? gmv : null, videos };
+    }
+    return out;
+  }
+  const sumUp = (list) => ({ units: list.reduce((s, r) => s + r.units, 0), gmv: list.some((r) => r.gmv != null) ? list.reduce((s, r) => s + (r.gmv || 0), 0) : null, videos: list.reduce((s, r) => s + r.videos, 0) });
+  const pct = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
+  const delta = (p, label) => (p == null ? "" : `<span class="delta ${p > 0 ? "up" : p < 0 ? "down" : ""}">${p > 0 ? "▲" : p < 0 ? "▼" : ""} ${Math.abs(p)}%${label ? ` <span>${label}</span>` : ""}</span>`);
+  const perVideo = (r) => (r.videos > 0 && r.gmv != null ? r.gmv / r.videos : null);
+  function bumpVid(date, name, by) {
+    const k = norm(name); if (!k) return;
+    S.vids[date] ??= {};
+    const n = Math.max(0, vidsOn(date, k) + by);
+    if (n) S.vids[date][k] = n; else delete S.vids[date][k];
+    persist("videos", { counts: S.vids }, "your videos");
+    if (!S.products.some((p) => norm(p.name) === k)) rememberProduct({ name: String(name).trim() });
+  }
+  function setPeriod(p) { S.period = p; try { localStorage.setItem("evee.period", p); } catch {} render(true); }
+  const periodSeg = () => `<div class="seg period">${Object.entries(PERIODS).map(([k, [l]]) => `<button aria-pressed="${S.period === k}" data-period="${k}">${l}</button>`).join("")}</div>`;
+  const rangeLabel = (days) => (days.length === 1 ? fmtDay(days[0], { weekday: "long", month: "short", day: "numeric" }) : `${fmtDay(days[days.length - 1], { month: "short", day: "numeric" })} – ${fmtDay(days[0], { month: "short", day: "numeric" })}`);
+
   function today() {
-    const Y = yesterday(), logged = S.sales[Y], recs = recommendations();
+    const Y = yesterday(), per = S.period, days = periodDays(per);
+    const cur = productStats(days), prev = productStats(periodDays(per, 1));
     const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-    const yRows = arr(logged?.rows).filter((r) => r.name);
-    const yUnits = yRows.reduce((s, r) => s + (num(r.units) || 0), 0), yRev = yRows.some((r) => num(r.revenue) != null) ? yRows.reduce((s, r) => s + (num(r.revenue) || 0), 0) : null;
-    const pastDays = Object.keys(S.sales).sort().reverse().slice(0, 14);
-    return `<div class="fade">
-      <p class="date">${fmtDay(dayKey())}</p>
-      <h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>
-      ${!logged ? `<section><div class="card logcta">
-          <h2>How did yesterday go?</h2>
-          <p class="note">Add your best sellers from ${fmtDay(Y, { weekday: "long" })}: drop in screenshots or type them. Evee tells you what to post today.</p>
-          <button class="btn" data-log="${Y}">Log yesterday’s best sellers</button></div></section>`
-        : `<div class="stats">
-          <div class="stat"><b>${yUnits.toLocaleString()}</b><span>Sold yesterday</span></div>
-          <div class="stat"><b>${money(yRev)}</b><span>Sales</span></div>
-          <div class="stat"><b>${yRows.length}</b><span>Products</span></div></div>`}
-      ${recs.length ? `<section><div class="sechead"><h2>What to post today</h2><small>from your numbers</small></div>
-        ${recs.slice(0, 4).map((r) => `<div class="rt">
-          <div class="sechead"><span class="chip ${TAG[r.tag][1]}">${TAG[r.tag][0]}</span>${spark(r.spark)}</div>
-          <h2>${esc(r.name)}</h2>
-          <p class="why">${esc(r.why)}</p>
-          <button class="btn" data-write="${esc(r.name)}">Write scripts for this</button></div>`).join("")}
-      </section>` : ready && Object.keys(S.sales).length ? `<section><div class="card empty">Log a couple more days and Evee will start spotting streaks and products going quiet.</div></section>` : ""}
-      ${!Object.keys(S.sales).length && ready ? `<section class="example"><div class="sechead"><h2>What you’ll see</h2><span class="pill warn">Example</span></div>
-        <div class="rt"><div class="sechead"><span class="chip streak">On a streak</span>${spark([2, 3, 5, 4, 6, 9, 14])}</div><h2>Mini car vacuum</h2><p class="why">Up 3 days in a row (6 → 9 → 14). Post 2–3 more while it’s climbing.</p></div></section>` : ""}
+    const hasAny = Object.keys(S.sales).length > 0;
+    const head = `<p class="date">${fmtDay(dayKey())}</p><h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>`;
+    if (ready && !hasAny) return `<div class="fade">${head}
+      <section><div class="card logcta"><h2>Let’s see what’s selling</h2>
+        <p class="note">Log yesterday’s sales from your TikTok Shop screenshots. Evee builds your planner: your top sellers, how many videos you made for each, and the GMV they brought in.</p>
+        <button class="btn" data-log="${Y}">Log yesterday’s sales</button></div></section>
+      <section class="example"><div class="sechead"><h2>Your top sellers</h2><span class="pill warn">Example</span></div>
+        <div class="list">${[["Mini car vacuum", 1240, 41, 6, "streak"], ["Silk pillowcase", 860, 22, 3, ""], ["Shapewear bodysuit", 610, 14, 1, "new"]].map(([n, g, u, v, t], i) => `<div class="prow"><span class="rank">${i + 1}</span><span class="name">${n} ${t ? `<span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}<div class="meta">${v} video${v > 1 ? "s" : ""} · ${money(g / v)} per video</div><span class="bar"><i style="width:${Math.round((g / 1240) * 100)}%"></i></span></span><span class="num">${money(g)}<small class="meta">${u} sold</small></span></div>`).join("")}</div></section>
+    </div>`;
+
+    const rows = Object.values(cur).filter((r) => r.units > 0 || (r.gmv || 0) > 0);
+    const useG = rows.some((r) => (r.gmv || 0) > 0), val = (r) => (useG ? r.gmv || 0 : r.units);
+    rows.sort((a, b) => val(b) - val(a) || b.units - a.units);
+    const T = sumUp(Object.values(cur)), TP = sumUp(Object.values(prev));
+    const tags = Object.fromEntries(recommendations().map((r) => [norm(r.name), r.tag]));
+    const max = Math.max(1, ...rows.map(val)), shown = rows.slice(0, S.showAll ? 10 : 5);
+    const anyVids = T.videos > 0;
+
+    // Retarget picks: best return per video, and sellers with no new videos.
+    const picks = [];
+    const best = rows.filter((r) => perVideo(r) != null && r.gmv > 0).sort((a, b) => perVideo(b) - perVideo(a))[0];
+    if (best) picks.push({ r: best, chip: ["Best return per video", "streak"], why: `${money(perVideo(best))} per video from ${best.videos} video${best.videos > 1 ? "s" : ""}. Post another one while it’s working.` });
+    const quiet = anyVids && rows.find((r) => r.videos === 0 && r !== best);
+    if (quiet) picks.push({ r: quiet, chip: ["No new videos", "quiet"], why: `${useG ? money(quiet.gmv) : quiet.units + " sold"} with no new videos ${per === "1d" ? "yesterday" : "this period"}. A fresh video could push it further.` });
+    const hot = rows.find((r) => ["streak", "jump", "new"].includes(tags[r.key]) && !picks.some((p) => p.r === r));
+    if (hot) picks.push({ r: hot, chip: TAG[tags[hot.key]], why: recommendations().find((x) => norm(x.name) === hot.key)?.why || "" });
+
+    return `<div class="fade">${head}
+      ${!S.sales[Y] ? `<button class="banner" data-log="${Y}"><span><b>Log yesterday’s sales</b><span class="note">Screenshots or typing, about a minute</span></span><span aria-hidden="true">→</span></button>` : ""}
+      <section>${periodSeg()}
+        <div class="card hero">
+          <div class="sechead"><span class="label">GMV · ${esc(rangeLabel(days))}</span>${delta(pct(T.gmv || 0, TP.gmv || 0))}</div>
+          <b class="big">${T.gmv != null ? money(T.gmv) : "—"}</b>
+          <div class="kpis">
+            <div><b>${T.units.toLocaleString()}</b><span>Units sold</span></div>
+            <div><b>${T.videos.toLocaleString()}</b><span>Videos posted</span></div>
+            <div><b>${T.videos && T.gmv != null ? money(T.gmv / T.videos) : "—"}</b><span>GMV per video</span></div>
+          </div>
+          ${!anyVids ? `<p class="note">Add how many videos you posted when you log sales, so Evee can show GMV per video.</p>` : ""}
+        </div></section>
+
+      <section><div class="sechead"><h2>Top sellers</h2><small>${PERIODS[per][2]}</small></div>
+        ${rows.length ? `<div class="list">${shown.map((r, i) => { const pr = prev[r.key], d = pr ? pct(val(r), val(pr)) : null, t = tags[r.key];
+          return `<button class="prow" data-prod="${esc(r.key)}"><span class="rank">${i + 1}</span>
+            <span class="name">${esc(r.name)}${t && t !== "steady" ? ` <span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}
+              <div class="meta">${r.videos} video${r.videos === 1 ? "" : "s"}${perVideo(r) != null ? ` · ${money(perVideo(r))} per video` : ""}${d != null ? ` · ${delta(d)}` : ""}</div>
+              <span class="bar"><i style="width:${Math.max(3, Math.round((val(r) / max) * 100))}%"></i></span></span>
+            <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>
+          ${rows.length > 5 ? `<button class="btn plain small" data-act="showall">${S.showAll ? "Show top 5" : `Show top ${Math.min(10, rows.length)}`}</button>` : ""}`
+        : `<div class="card empty">No sales logged ${per === "1d" ? "for yesterday" : "in this period"} yet.<br><br><button class="btn" data-log="${Y}">Log yesterday’s sales</button></div>`}
+      </section>
+
+      ${picks.length ? `<section><div class="sechead"><h2>Retarget today</h2><small>from your numbers</small></div>
+        ${picks.map((p) => `<div class="rt"><span class="chip ${p.chip[1]}">${p.chip[0]}</span><h2>${esc(p.r.name)}</h2><p class="why">${esc(p.why)}</p>
+          <div class="btns"><button class="btn small" data-write="${esc(p.r.name)}">Write scripts</button><button class="btn ghost small" data-fwfor="${esc(p.r.name)}">Try a new framework</button></div></div>`).join("")}</section>` : ""}
+
       ${workingCard(true)}
-      ${Object.keys(salesByProduct()).length ? productTable() : ""}
-      ${pastDays.length ? `<section><div class="sechead"><h2>Past days</h2><button class="btn plain small" data-log="${dayKey()}">Log another day</button></div>
-        <div class="list">${pastDays.map((d) => { const rows = arr(S.sales[d].rows).filter((r) => r.name); const u = rows.reduce((s, r) => s + (num(r.units) || 0), 0); const top = rows.slice().sort((a, b) => (num(b.units) || 0) - (num(a.units) || 0))[0];
-          return `<button class="row two" data-log="${d}"><span class="name">${fmtDay(d, { weekday: "short", month: "short", day: "numeric" })}<div class="meta">${top ? `Top: ${esc(top.name)}` : "No sales logged"}</div></span><span class="num">${u.toLocaleString()} sold</span></button>`; }).join("")}</div></section>` : ""}
+
+      <section><div class="sechead"><h2>Sales log</h2><button class="btn plain small" data-log="${dayKey()}">Log another day</button></div>
+        <div class="list">${Object.keys(S.sales).sort().reverse().slice(0, 7).map((d) => { const rs = arr(S.sales[d].rows).filter((r) => r.name); const g = rs.some((r) => num(r.revenue) != null) ? rs.reduce((s, r) => s + (num(r.revenue) || 0), 0) : null; const v = Object.values(S.vids[d] || {}).reduce((s, n) => s + (num(n) || 0), 0);
+          return `<button class="row two" data-log="${d}"><span class="name">${fmtDay(d, { weekday: "short", month: "short", day: "numeric" })}<div class="meta">${rs.length} product${rs.length === 1 ? "" : "s"}${v ? ` · ${v} video${v === 1 ? "" : "s"}` : ""}</div></span><span class="num">${g != null ? money(g) : rs.reduce((s, r) => s + (num(r.units) || 0), 0) + " sold"}</span></button>`; }).join("")}</div></section>
     </div>`;
   }
-  function productTable() {
-    const Y = yesterday(), days = [...Array(7)].map((_, i) => addDays(Y, -6 + i));
-    const rows = Object.values(salesByProduct()).map((p) => ({ ...p, w: days.reduce((s, d) => s + (p.byDay[d] || 0), 0), wr: days.reduce((s, d) => s + (p.rev[d] || 0), 0) })).filter((p) => p.w > 0).sort((a, b) => b.w - a.w);
-    if (!rows.length) return "";
-    return `<section><div class="sechead"><h2>This week</h2><small>last 7 days</small></div>
-      <div class="list">${rows.slice(0, 12).map((p, i) => `<button class="row" data-write="${esc(p.name)}"><span class="rank">${i + 1}</span><span class="name">${esc(p.name)}<div class="meta">${spark(days.map((d) => p.byDay[d] || 0))}</div></span><span class="num">${p.w.toLocaleString()} sold${p.wr ? `<small class="meta">${money(p.wr)}</small>` : ""}</span></button>`).join("")}</div>
-      <p class="note">Tap a product to write scripts for it.</p></section>`;
+
+  function productView(k) {
+    const per = S.period, days = periodDays(per), Y = yesterday();
+    const st = productStats(days)[k] || { key: k, name: nameFor(k), units: 0, gmv: null, videos: 0 };
+    const pv = productStats(periodDays(per, 1))[k];
+    const P = salesByProduct()[k] || { byDay: {}, rev: {} };
+    const span = [...Array(per === "30d" ? 30 : 14)].map((_, i) => addDays(Y, -i)).reverse();
+    const useG = span.some((d) => (P.rev[d] || 0) > 0), dv = (d) => (useG ? P.rev[d] || 0 : P.byDay[d] || 0);
+    const mx = Math.max(1, ...span.map(dv));
+    const scripts = Object.values(S.saved).filter((d) => norm(d.product?.name) === k).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    const stepper = (d, label) => `<div class="vstep"><span>${label}</span><div><button class="x" data-vid="${d}|-1" aria-label="One fewer video">−</button><b>${vidsOn(d, k)}</b><button class="x" data-vid="${d}|1" aria-label="One more video">+</button></div></div>`;
+    return `<div class="fade"><button class="back" data-act="back">← Home</button>
+      <h1>${esc(st.name)}</h1>
+      <section>${periodSeg()}
+        <div class="card hero">
+          <div class="sechead"><span class="label">GMV · ${esc(rangeLabel(days))}</span>${pv ? delta(pct(st.gmv || 0, pv.gmv || 0)) : ""}</div>
+          <b class="big">${st.gmv != null ? money(st.gmv) : "—"}</b>
+          <div class="kpis">
+            <div><b>${st.units.toLocaleString()}</b><span>Units sold</span></div>
+            <div><b>${st.videos}</b><span>Videos</span></div>
+            <div><b>${perVideo(st) != null ? money(perVideo(st)) : "—"}</b><span>GMV per video</span></div>
+          </div></div></section>
+      <section><div class="card"><div class="sechead"><span class="label">${useG ? "Daily GMV" : "Daily units"} · last ${span.length} days</span><small class="meta"><span class="vkey">●</span> video posted</small></div>
+        <div class="chart" role="img" aria-label="Daily sales for the last ${span.length} days">${span.map((d) => `<span class="col" title="${fmtDay(d, { month: "short", day: "numeric" })}: ${useG ? money(P.rev[d] || 0) : (P.byDay[d] || 0) + " sold"}${vidsOn(d, k) ? `, ${vidsOn(d, k)} video(s)` : ""}"><i class="dot${vidsOn(d, k) ? " on" : ""}"></i><i class="b${dv(d) ? "" : " zero"}" style="height:${Math.max(3, Math.round((dv(d) / mx) * 100))}%"></i></span>`).join("")}</div>
+        <div class="axis"><span>${fmtDay(span[0], { month: "short", day: "numeric" })}</span><span>${fmtDay(span[span.length - 1], { month: "short", day: "numeric" })}</span></div></div></section>
+      <section><div class="card"><span class="label">Videos you posted</span>${stepper(dayKey(), "Today")}${stepper(Y, "Yesterday")}
+        <p class="note">Marking a saved script Posted adds it here too.</p></div></section>
+      <section><div class="btns"><button class="btn" data-write="${esc(st.name)}">Write scripts for this</button><button class="btn ghost" data-fwfor="${esc(st.name)}">Try a new framework</button></div></section>
+      ${scripts.length ? `<section><div class="sechead"><h2>Your scripts for this</h2></div><div class="list">${scripts.slice(0, 8).map((d) => `<button class="row two" data-saved="${d.id}"><span class="name">${esc(d.script?.title || FW[d.script?.framework]?.name)}<div class="meta">${esc(FW[d.script?.framework]?.name || "")} · ${shortDay(d.createdAt)}</div></span><span class="num"><span class="chip ${d.status || "idea"}">${STATUS[d.status || "idea"]}</span></span></button>`).join("")}</div></section>` : ""}
+    </div>`;
   }
   function logView() {
     const L = S.log; if (!L) return today();
     const names = [...new Set([...S.products.map((p) => p.name), ...Object.values(salesByProduct()).map((p) => p.name)])].filter(Boolean);
     return `<div class="fade"><button class="back" data-act="back">← Back</button>
-      <h1>Best sellers</h1><p class="date">${fmtDay(L.date)}</p>
+      <h1>Log sales</h1><p class="date">${fmtDay(L.date)}</p>
       <section>${busyIs("read") ? busyCard() : `<div class="card shots">
         <h2>Fill from screenshots</h2>
-        <p class="note">In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales. Add as many screenshots as you need.</p>
+        <p class="note">In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales (GMV and units). Add as many screenshots as you need.</p>
         <label class="drop"><input type="file" id="shots" accept="image/*" multiple>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
           <b>Choose screenshots</b><span class="note">Evee fills in the products and numbers for you</span></label>
@@ -262,11 +353,12 @@ export function mount(root, { supabase, email }) {
         ${L.rows.map((r, i) => `<div class="logrow">
           <div class="field"><label for="lr${i}n">Product</label><input type="text" id="lr${i}n" list="known" data-bind="log.rows.${i}.name" value="${esc(r.name)}" placeholder="Product name"></div>
           <div class="field"><label for="lr${i}u">Sold</label><input type="text" inputmode="numeric" id="lr${i}u" data-bind="log.rows.${i}.units" value="${esc(r.units)}" placeholder="12"></div>
-          <div class="field"><label for="lr${i}r">Sales $</label><input type="text" inputmode="decimal" id="lr${i}r" data-bind="log.rows.${i}.revenue" value="${esc(r.revenue)}" placeholder="opt."></div>
+          <div class="field"><label for="lr${i}r">GMV $</label><input type="text" inputmode="decimal" id="lr${i}r" data-bind="log.rows.${i}.revenue" value="${esc(r.revenue)}" placeholder="240"></div>
+          <div class="field"><label for="lr${i}v">Videos</label><input type="text" inputmode="numeric" id="lr${i}v" data-bind="log.rows.${i}.videos" value="${esc(r.videos ?? "")}" placeholder="0"></div>
           ${L.rows.length > 1 ? `<button class="x" data-rmrow="${i}" aria-label="Remove row">×</button>` : `<span></span>`}
         </div>`).join("")}
         <button class="btn ghost small" data-act="addrow">+ Add product</button>
-        <p class="note">Units sold matters most; sales $ is optional.</p>
+        <p class="note">Videos = how many you posted for that product that day. That’s how Evee works out GMV per video.</p>
         ${errBox()}
         <button class="btn" data-act="savelog">Save</button>
         ${S.sales[L.orig] ? `<button class="btn plain" data-act="dellog">Delete this day</button>` : ""}
@@ -274,7 +366,7 @@ export function mount(root, { supabase, email }) {
   }
   function openLog(date) {
     const doc = S.sales[date];
-    S.log = { date, orig: date, rows: doc ? clone(arr(doc.rows)).map((r) => ({ name: r.name || "", units: r.units ?? "", revenue: r.revenue ?? "" })) : [blankRow(), blankRow(), blankRow()] };
+    S.log = { date, orig: date, rows: doc ? clone(arr(doc.rows)).map((r) => ({ name: r.name || "", units: r.units ?? "", revenue: r.revenue ?? "", videos: S.vids[date]?.[norm(r.name)] ?? "" })) : [blankRow(), blankRow(), blankRow()] };
     if (!S.log.rows.length) S.log.rows = [blankRow()];
     push("log");
   }
@@ -288,6 +380,13 @@ export function mount(root, { supabase, email }) {
     if (L.orig !== L.date && S.sales[L.orig]) { delete S.sales[L.orig]; delDoc("sales-" + L.orig).catch(() => {}); }
     S.sales[L.date] = doc;
     persist("sales-" + L.date, doc, "your sales");
+    const vrows = L.rows.filter((r) => String(r.name || "").trim() && num(r.videos) != null);
+    if (vrows.length || (L.orig !== L.date && S.vids[L.orig])) {
+      if (L.orig !== L.date && S.vids[L.orig]) { S.vids[L.date] = { ...S.vids[L.orig], ...(S.vids[L.date] || {}) }; delete S.vids[L.orig]; }
+      S.vids[L.date] ??= {};
+      for (const r of vrows) { const n = Math.max(0, Math.round(num(r.videos))); if (n) S.vids[L.date][norm(r.name)] = n; else delete S.vids[L.date][norm(r.name)]; }
+      persist("videos", { counts: S.vids }, "your videos");
+    }
     for (const r of rows) if (!S.products.some((p) => norm(p.name) === norm(r.name))) rememberProduct({ name: r.name });
     S.log = null; go("today"); toast("Saved");
   }
@@ -532,6 +631,7 @@ export function mount(root, { supabase, email }) {
   function frameworks() {
     return `<div class="fade"><h1>Viral frameworks</h1>
       <p class="lede">The ${FRAMEWORKS.length} structures Evee writes with. She picks the best ones for your product, or you can choose one.</p>
+      ${S.product.name ? `<p class="forced">Picking a framework for <b>${esc(S.product.name)}</b></p>` : ""}
       <section><details class="card fw formula" open><summary><span><b>The conversion formula</b><span class="note">Every script follows Hook → Pain point → Solution → CTA</span></span></summary>
         ${SPINE.map((p, n) => `<div class="spine"><span class="part p-${p.id}">${n + 1}. ${esc(p.name)}</span><p><b>${esc(p.goal)}</b></p><ul class="ul">${p.how.map((h) => `<li>${esc(h)}</li>`).join("")}</ul></div>`).join("")}
         <div class="whybox"><span class="label">Persuasion principles Evee uses</span><ul class="ul">${PRINCIPLES.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
@@ -572,13 +672,17 @@ export function mount(root, { supabase, email }) {
   on("change", (e) => { const c = e.target.dataset?.check; if (c) { S[c] = e.target.checked; render(true); } });
   on("click", (e) => {
     if (!root.contains(e.target)) return;
-    const el = e.target.closest("[data-go],[data-act],[data-style],[data-length],[data-open],[data-close],[data-save],[data-copy],[data-remix],[data-recent],[data-saved],[data-status],[data-filter],[data-usefw],[data-log],[data-rmrow],[data-write],[data-mode]");
+    const el = e.target.closest("[data-go],[data-act],[data-style],[data-length],[data-open],[data-close],[data-save],[data-copy],[data-remix],[data-recent],[data-saved],[data-status],[data-filter],[data-usefw],[data-log],[data-rmrow],[data-write],[data-mode],[data-period],[data-prod],[data-vid],[data-fwfor]");
     if (!el) return; const d = el.dataset;
     if (d.go !== undefined) { if (d.go === "you") push("you"); else go(d.go); return; }
     if (d.log) { openLog(d.log); return; }
     if (d.mode) { S.mode = d.mode; S.err = ""; render(true); return; }
     if (d.rmrow !== undefined) { S.log.rows.splice(+d.rmrow, 1); render(true); return; }
     if (d.write) { writeFor(d.write); return; }
+    if (d.period) { setPeriod(d.period); return; }
+    if (d.prod) { push("p:" + d.prod); return; }
+    if (d.vid) { const [dt, by] = d.vid.split("|"), k = stack[stack.length - 1].slice(2); bumpVid(dt, nameFor(k), +by); render(true); return; }
+    if (d.fwfor) { const known = S.products.find((p) => norm(p.name) === norm(d.fwfor)); S.product = { ...blankProduct(), ...(known || {}), name: d.fwfor }; go("frameworks"); toast(`Pick a framework for ${d.fwfor}.`); return; }
     if (d.style) { S.opts.style = d.style; render(true); return; }
     if (d.length) { S.opts.length = d.length; render(true); return; }
     if (d.open !== undefined) { S.open[d.open] = true; render(true); return; }
@@ -586,8 +690,8 @@ export function mount(root, { supabase, email }) {
     if (d.recent) { const x = S.products.find((p) => p.name === d.recent); if (x) { S.product = { ...blankProduct(), ...x }; render(true); } return; }
     if (d.saved) { S.perfDraft = clone(S.saved[d.saved]?.perf || {}); push("k:" + d.saved); return; }
     if (d.filter !== undefined) { S.filter = d.filter; render(true); return; }
-    if (d.usefw) { S.opts.framework = d.usefw; go("create"); toast(`Using ${FW[d.usefw].name}. Add your product.`); return; }
-    if (d.status) { const id = stack[stack.length - 1].slice(2), doc = S.saved[id]; if (doc) { doc.status = d.status; if (d.status === "posted" && !doc.postedAt) doc.postedAt = new Date().toISOString(); persist("k-" + id, doc, "the status"); render(true); } return; }
+    if (d.usefw) { S.opts.framework = d.usefw; go("create"); toast(S.product.name ? `Using ${FW[d.usefw].name} for ${S.product.name}.` : `Using ${FW[d.usefw].name}. Add your product.`); return; }
+    if (d.status) { const id = stack[stack.length - 1].slice(2), doc = S.saved[id]; if (doc) { doc.status = d.status; if (d.status === "posted" && !doc.postedAt) { doc.postedAt = new Date().toISOString(); if (doc.product?.name) { bumpVid(dayKey(), doc.product.name, 1); toast(`Counted as a video for ${doc.product.name} today`); } } persist("k-" + id, doc, "the status"); render(true); } return; }
     if (d.save !== undefined) {
       const s = S.result?.scripts[+d.save]; if (!s) return;
       const id = uid(); const sc = clone(s); delete sc.savedId;
@@ -616,6 +720,7 @@ export function mount(root, { supabase, email }) {
       case "saverw": { const a = S.analysis; if (!a?.rewrite) break; const id = uid(); const doc = { id, product: clone(a.product || { name: a.frameworkName ? "Rewritten script" : "Script", price: "", audience: "", details: "" }), opts: { style: S.opts.style, length: S.opts.length }, script: clone(a.rewrite), status: "idea", createdAt: new Date().toISOString() };
         if (!doc.product.name) doc.product.name = "Rewritten script";
         S.saved[id] = doc; a.savedId = id; persist("k-" + id, doc, "that script"); toast("Saved"); render(true); break; }
+      case "showall": S.showAll = !S.showAll; render(true); break;
       case "unforce": S.opts.framework = ""; render(true); break;
       case "addrow": S.log.rows.push(blankRow()); render(true); root.querySelector(`#lr${S.log.rows.length - 1}n`)?.focus(); break;
       case "savelog": saveLog(); break;
