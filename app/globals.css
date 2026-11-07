@@ -338,3 +338,13 @@ button.prow:hover{background:var(--sunk)}
 .aff p{margin:0;font-family:var(--display);font-size:19px;line-height:1.35;font-weight:500;text-wrap:pretty}
 .aff .btns{gap:2px;margin-left:-8px}
 .aff .btn.plain{color:var(--accent)}
+.dropwrap{display:grid;gap:2px;justify-items:center}
+.dropbtn{position:relative;width:100%;display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;background:var(--accent);color:var(--on-accent);cursor:pointer;box-shadow:0 6px 18px -8px rgb(85 97 58 / .6)}
+.dropbtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.dropbtn svg{width:30px;height:30px;flex:none}
+.dropbtn b{display:block;font-family:var(--display);font-size:18px;line-height:1.2}
+.dropbtn span span{font-size:13px;opacity:.85}
+.dropbtn:focus-within{outline:3px solid var(--accent);outline-offset:3px}
+.banner.done{background:var(--good-soft);border-color:transparent}
+.banner.done>span:last-child{color:var(--good)}
+section.first{margin-top:16px}

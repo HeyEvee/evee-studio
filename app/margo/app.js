@@ -154,6 +154,8 @@ export function mount(root, { supabase, email }) {
     window.scrollTo(0, keep ? y : 0);
     const shots = root.querySelector("#shots");
     if (shots) shots.onchange = () => { const f = [...shots.files]; shots.value = ""; readScreenshots(f); };
+    const hs = root.querySelector("#homeshots");
+    if (hs) hs.onchange = () => { const f = [...hs.files]; hs.value = ""; if (!f.length) return; openLog(yesterday()); readScreenshots(f); };
   }
 
   /* ================= TODAY: best sellers + what to post ================= */
@@ -228,19 +230,24 @@ export function mount(root, { supabase, email }) {
   const periodSeg = () => `<div class="seg period">${Object.entries(PERIODS).map(([k, [l]]) => `<button aria-pressed="${S.period === k}" data-period="${k}">${l}</button>`).join("")}</div>`;
   const rangeLabel = (days) => (days.length === 1 ? fmtDay(days[0], { weekday: "long", month: "short", day: "numeric" }) : `${fmtDay(days[days.length - 1], { month: "short", day: "numeric" })} – ${fmtDay(days[0], { month: "short", day: "numeric" })}`);
 
+  const dropBtn = (Y) => `<div class="dropwrap"><label class="dropbtn"><input type="file" id="homeshots" accept="image/*" multiple>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+      <span><b>Drop yesterday’s stats</b><span>Upload your TikTok Shop screenshots</span></span></label>
+      <button class="btn plain small" data-log="${Y}">or type them in</button></div>`;
   function today() {
     const Y = yesterday(), per = S.period, days = periodDays(per);
     const cur = productStats(days), prev = productStats(periodDays(per, 1));
     const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
     const hasAny = Object.keys(S.sales).length > 0;
     const affText = AFFIRMATIONS[(affirmationIndex(dayKey()) + S.aff) % AFFIRMATIONS.length];
-    const head = `<p class="date">${fmtDay(dayKey())}</p><h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>
-      <div class="aff"><span class="label">${S.aff ? "Affirmation" : "Today’s affirmation"}</span><p>${esc(affText)}</p>
+    const top = `<p class="date">${fmtDay(dayKey())}</p><h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>`;
+    const affCard = `<div class="aff"><span class="label">${S.aff ? "Affirmation" : "Today’s affirmation"}</span><p>${esc(affText)}</p>
         <div class="btns"><button class="btn plain small" data-act="nextaff">Another one</button><button class="btn plain small" data-act="copyaff">Copy</button></div></div>`;
+    const head = top + affCard;
     if (ready && !hasAny) return `<div class="fade">${head}
       <section><div class="card logcta"><h2>Let’s see what’s selling</h2>
-        <p class="note">Log yesterday’s sales from your TikTok Shop screenshots. Evee builds your planner: your top sellers, how many videos you made for each, and the GMV they brought in.</p>
-        <button class="btn" data-log="${Y}">Log yesterday’s sales</button></div></section>
+        <p class="note">In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales. Drop them here and Evee builds your planner: your top sellers, how many videos you made for each, and the GMV they brought in.</p>
+        ${dropBtn(Y)}</div></section>
       <section class="example"><div class="sechead"><h2>Your top sellers</h2><span class="pill warn">Example</span></div>
         <div class="list">${[["Mini car vacuum", 1240, 41, 6, "streak"], ["Silk pillowcase", 860, 22, 3, ""], ["Shapewear bodysuit", 610, 14, 1, "new"]].map(([n, g, u, v, t], i) => `<div class="prow"><span class="rank">${i + 1}</span><span class="name">${n} ${t ? `<span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}<div class="meta">${v} video${v > 1 ? "s" : ""} · ${money(g / v)} per video</div><span class="bar"><i style="width:${Math.round((g / 1240) * 100)}%"></i></span></span><span class="num">${money(g)}<small class="meta">${u} sold</small></span></div>`).join("")}</div></section>
     </div>`;
@@ -262,8 +269,9 @@ export function mount(root, { supabase, email }) {
     const hot = rows.find((r) => ["streak", "jump", "new"].includes(tags[r.key]) && !picks.some((p) => p.r === r));
     if (hot) picks.push({ r: hot, chip: TAG[tags[hot.key]], why: recommendations().find((x) => norm(x.name) === hot.key)?.why || "" });
 
-    return `<div class="fade">${head}
-      ${!S.sales[Y] ? `<button class="banner" data-log="${Y}"><span><b>Log yesterday’s sales</b><span class="note">Screenshots or typing, about a minute</span></span><span aria-hidden="true">→</span></button>` : ""}
+    return `<div class="fade">${top}
+      ${!S.sales[Y] ? `<section class="first">${dropBtn(Y)}</section>` : `<button class="banner done" data-log="${Y}"><span><b>✓ Yesterday’s stats are in</b><span class="note">Tap to check or add more screenshots</span></span><span aria-hidden="true">→</span></button>`}
+      ${affCard}
       <section>${periodSeg()}
         <div class="card hero">
           <div class="sechead"><span class="label">GMV · ${esc(rangeLabel(days))}</span>${delta(pct(T.gmv || 0, TP.gmv || 0))}</div>
