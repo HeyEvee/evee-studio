@@ -334,3 +334,7 @@ button.prow:hover{background:var(--sunk)}
 .logrow{padding-top:10px;border-top:1px solid var(--line)}
 @media (max-width:360px){.logrow{grid-template-columns:repeat(3,minmax(0,1fr)) 24px}}
 .vkey{color:var(--warn)}
+.aff{margin-top:16px;border-radius:16px;padding:16px 16px 8px;background:linear-gradient(135deg,var(--accent-soft),var(--good-soft));display:grid;gap:6px}
+.aff p{margin:0;font-family:var(--display);font-size:19px;line-height:1.35;font-weight:500;text-wrap:pretty}
+.aff .btns{gap:2px;margin-left:-8px}
+.aff .btn.plain{color:var(--accent)}

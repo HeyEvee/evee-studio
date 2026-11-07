@@ -1,6 +1,7 @@
 // Evee Studio app screens. Plain DOM rendering, mounted by MargoMount.tsx.
 // Data: Supabase "docs" table (private per person). AI: /api/evee (prompts live on the server).
 import { FRAMEWORKS } from "@/lib/library";
+import { AFFIRMATIONS, affirmationIndex } from "@/lib/affirmations";
 import { SPINE, PRINCIPLES, PITFALLS } from "@/lib/playbook";
 
 export function mount(root, { supabase, email }) {
@@ -47,7 +48,7 @@ export function mount(root, { supabase, email }) {
   let stack = ["today"];
   let userId = null, ready = false;
   const S = {
-    err: "", busy: null, q: "",
+    err: "", busy: null, q: "", aff: 0,
     products: [], sales: {}, log: null, // log = { date, rows } while editing
     vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
     profile: { name: "" }, profileRaw: {},
@@ -232,7 +233,10 @@ export function mount(root, { supabase, email }) {
     const cur = productStats(days), prev = productStats(periodDays(per, 1));
     const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
     const hasAny = Object.keys(S.sales).length > 0;
-    const head = `<p class="date">${fmtDay(dayKey())}</p><h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>`;
+    const affText = AFFIRMATIONS[(affirmationIndex(dayKey()) + S.aff) % AFFIRMATIONS.length];
+    const head = `<p class="date">${fmtDay(dayKey())}</p><h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>
+      <div class="aff"><span class="label">${S.aff ? "Affirmation" : "Today’s affirmation"}</span><p>${esc(affText)}</p>
+        <div class="btns"><button class="btn plain small" data-act="nextaff">Another one</button><button class="btn plain small" data-act="copyaff">Copy</button></div></div>`;
     if (ready && !hasAny) return `<div class="fade">${head}
       <section><div class="card logcta"><h2>Let’s see what’s selling</h2>
         <p class="note">Log yesterday’s sales from your TikTok Shop screenshots. Evee builds your planner: your top sellers, how many videos you made for each, and the GMV they brought in.</p>
@@ -450,6 +454,8 @@ export function mount(root, { supabase, email }) {
     switch (d.act) {
       case "back": back(); break;
       case "stop": S.busy?.ctl.abort(); break;
+      case "nextaff": S.aff = (S.aff + 1) % AFFIRMATIONS.length || 1; render(true); break;
+      case "copyaff": copy(AFFIRMATIONS[(affirmationIndex(dayKey()) + S.aff) % AFFIRMATIONS.length]); break;
       case "showall": S.showAll = !S.showAll; render(true); break;
       case "addrow": S.log.rows.push(blankRow()); render(true); root.querySelector(`#lr${S.log.rows.length - 1}n`)?.focus(); break;
       case "savelog": saveLog(); break;
