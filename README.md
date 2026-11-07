@@ -1,13 +1,12 @@
 # Evee Studio
 
-*Viral TikTok Shop scripts for your products, with coaching.* A sister app to Hey Evee, built as an installable web app (PWA).
+*Your TikTok Shop success planner.* A sister app to Hey Evee, built as an installable web app (PWA).
 
-- **Home (your planner):** greets you with your top 5–10 best sellers for Yesterday, 7 days or 30 days: GMV, units, videos posted, GMV per video and the change vs the period before. "Retarget today" picks out the best return per video, sellers with no new videos, and products on a streak. Tap a product for its daily chart and video count. Log sales from screenshots (several at once) or by typing product, units, GMV and videos.
-- **Create:** enter product, price, who it's for and an optional note. Evee picks the 3 best frameworks from the built-in library and writes 3 ready-to-film scripts (hook, time-coded beats, CTA, caption, hashtags) plus coaching: which to film first, the angle that matters, what to test, filming tips and one thing to watch out for.
-- **Break down a script** (in Create): paste a draft, a transcript of a video that's selling, or a description. Evee rates the Hook, Pain point, Solution and CTA, explains what's working, and writes a stronger version.
-- **Saved:** scripts you keep, marked To film / Filmed / Posted. On Posted scripts, log views, orders, clicks and sales. **What's working for you** ranks frameworks by orders per 1,000 views, and Evee leans on each person's winners when she writes (while still testing others).
-- **Frameworks:** the 21 built-in viral frameworks with beats, best uses and Evee's tip. Pick one to write with it.
-- **You:** name, your voice (how you come across, phrases you say, words to avoid), sign out.
+- **Home:** greets you with your top 5–10 best sellers for Yesterday, 7 days or 30 days: GMV, units, videos posted, GMV per video and the change vs the period before. "Retarget today" picks out the best return per video, sellers with no new videos, and products on a streak.
+- **Log sales:** from TikTok Shop screenshots (several at once; Evee reads them and you check) or by typing product, units, GMV and videos.
+- **Products:** every product ranked for the period, searchable. Tap one for its daily chart, video count and + / − for videos posted today or yesterday.
+- **Frameworks:** 21 proven viral video structures plus the conversion formula (Hook → Pain point → Solution → CTA) to study and copy.
+- **You:** name, sign out.
 
 Private beta: invite-only, free.
 
@@ -17,9 +16,9 @@ Private beta: invite-only, free.
 | --- | --- |
 | Next.js 14 on Vercel | The app, login and API |
 | Supabase Auth | Email + 8-digit code sign-in, invite-only |
-| Supabase Postgres | `docs` (each person's private data: profile, products, sales days, saved scripts), `ai_calls` (daily limits) |
-| Anthropic Claude (`lib/claude.ts`) | Writes every script and the coaching |
-| `/api/evee` | The only way the app reaches the AI. Prompts live on the server (`lib/studio.ts`). The key never reaches the phone. |
+| Supabase Postgres | `docs` (each person's private data: profile, products, sales days, video counts), `ai_calls` (daily limits) |
+| Anthropic Claude (`lib/claude.ts`) | Reads sales screenshots |
+| `/api/evee` | The only way the app reaches the AI. Prompts live on the server (`lib/studio.ts`, the screenshot-reading prompt). The key never reaches the phone. |
 
 Key files: `lib/playbook.ts` (Evee's conversion playbook: Hook → Pain point → Solution → CTA, persuasion principles, pitfalls), `lib/library.ts` (the 21 frameworks: add one here), `lib/studio.ts` (everything Evee is told), `app/margo/app.js` (the screens), `supabase/schema.sql` (database). The "What to post today" suggestions are simple rules in `app.js` (`recommendations()`), so they're instant and free.
 
@@ -58,7 +57,7 @@ iPhone: Safari → Share → **Add to Home Screen**. Android: Chrome → ⋮ →
 
 ## Running costs
 - Vercel Hobby and Supabase Free cover a small beta.
-- Each "Write my scripts" and each "New version" is one Claude request. `AI_DAILY_LIMIT` caps each person per 24 hours. Logging sales and the "What to post today" suggestions cost nothing.
+- Each screenshot read is one Claude request (a few cents at most). `AI_DAILY_LIMIT` caps each person per 24 hours. Typing sales, the planner and the frameworks cost nothing.
 
 ## Later
 - **Automatic sales:** TikTok Shop Partner Center API, once approved, replaces typing in best sellers.
