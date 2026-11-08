@@ -1,4 +1,5 @@
 import Pricing from "./Pricing";
+import { FRAMEWORKS } from "@/lib/library";
 import "./landing.css";
 
 const STEPS = [
@@ -57,9 +58,9 @@ export default function Landing({ foundingLeft, notice }: { foundingLeft: number
         <section className="lp-feature flip">
           <figure className="lp-phone small"><img src="/landing/framework.webp" width={390} height={844} loading="lazy" alt="A framework laid out for a padded bra: three hook ideas, each with what to show, a line to say and on-screen text" /></figure>
           <div>
-            <p className="lp-eyebrow">21 viral frameworks</p>
+            <p className="lp-eyebrow">{FRAMEWORKS.length} viral frameworks</p>
             <h2>Proven formats, shown for your product</h2>
-            <p className="lp-sub">Study the structures that sell on TikTok Shop, from Price Shock to Problem → Solution. Tap “See it with my product” and Evee lays it out for your product: three hooks to try, then what to show and what to talk about at every step, in your own words.</p>
+            <p className="lp-sub">Study the structures that sell on TikTok Shop, from Price Shock and Split Screen to Rage Bait. Tap “See it with my product” and Evee lays it out for your product: three hooks to try, then what to show and what to talk about at every step, in your own words.</p>
           </div>
         </section>
 

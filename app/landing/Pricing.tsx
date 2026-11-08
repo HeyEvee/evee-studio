@@ -1,4 +1,5 @@
 import { FOUNDING_LIMIT, TRIAL_DAYS } from "@/lib/billing";
+import { FRAMEWORKS } from "@/lib/library";
 
 const NOTICE: Record<string, string> = {
   "founding-full": "Founding spots just filled up. Monthly and yearly plans are still open.",
@@ -6,7 +7,7 @@ const NOTICE: Record<string, string> = {
   unavailable: "Checkout isn’t open yet. Check back soon.",
 };
 
-const INCLUDED = ["Daily planner: top sellers, GMV and videos", "Evee reads your sales screenshots", "21 viral frameworks, shown for your products", "Retarget picks and daily affirmations"];
+const INCLUDED = ["Daily planner: top sellers, GMV and videos", "Evee reads your sales screenshots", `${FRAMEWORKS.length} viral frameworks, shown for your products`, "Retarget picks and daily affirmations"];
 
 export default function Pricing({ foundingLeft, notice, email }: { foundingLeft: number | null; notice?: string | null; email?: string }) {
   const foundingOpen = foundingLeft !== 0;
