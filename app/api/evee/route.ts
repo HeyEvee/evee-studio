@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { askClaude, MargoError } from "@/lib/claude";
 import { spendAllowance } from "@/lib/limit";
-import { readSalesPrompt } from "@/lib/studio";
+import { readSalesPrompt, tailorPrompt } from "@/lib/studio";
+import { FW } from "@/lib/library";
 import type { ImageIn } from "@/lib/claude";
 
 export const runtime = "nodejs";
@@ -38,6 +39,24 @@ export async function POST(req: Request) {
     } catch (e: any) {
       if (e instanceof MargoError) return fail(e.status, e.code, e.message);
       console.error("evee read error", e);
+      return fail(500, "upstream_error", "Something went wrong. Try again.");
+    }
+  }
+
+  if (body?.action === "tailor") {
+    try {
+      const fw = typeof body?.framework === "string" && FW[body.framework] ? body.framework : null;
+      if (!fw) return fail(400, "bad_request", "Pick a framework first.");
+      const p = { name: str(body?.product?.name, 200), price: str(body?.product?.price, 40), audience: str(body?.product?.audience, 400), details: str(body?.product?.details, 1000) };
+      if (!p.name) return fail(400, "bad_request", "Add your product first.");
+      await spendAllowance(supabase, "tailor");
+      const out: any = await askClaude(tailorPrompt(fw, p), { json: true, maxTokens: 1800, fast: true });
+      const beats = (Array.isArray(out?.beats) ? out.beats : []).filter((b: any) => b && (b.show || b.say)).slice(0, 10);
+      if (!beats.length) throw new MargoError("invalid_json", "Evee’s walkthrough came back incomplete. Try again.", 502);
+      return NextResponse.json({ result: { fit: out.fit || "", hook: out.hook || {}, beats, tip: out.tip || "" } });
+    } catch (e: any) {
+      if (e instanceof MargoError) return fail(e.status, e.code, e.message);
+      console.error("evee tailor error", e);
       return fail(500, "upstream_error", "Something went wrong. Try again.");
     }
   }

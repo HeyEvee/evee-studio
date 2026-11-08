@@ -16,7 +16,19 @@ function anthropic() {
 
 export type ImageIn = { media_type: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; data: string };
 
-export async function askClaude(prompt: string, opts: { images?: ImageIn[]; maxTokens?: number; json?: boolean } = {}) {
+// "fast" uses the smaller, cheaper model (ANTHROPIC_FAST_MODEL) for short, simple jobs, and falls back to the main model if it isn't available.
+export async function askClaude(prompt: string, opts: { images?: ImageIn[]; maxTokens?: number; json?: boolean; fast?: boolean } = {}): Promise<any> {
+  if (opts.fast) {
+    try {
+      return await askClaudeWith(process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-5-5", prompt, opts);
+    } catch (e: any) {
+      if (!(e instanceof MargoError) || !["not_configured", "invalid_json"].includes(e.code) || /AI key/.test(e.message)) throw e;
+    }
+  }
+  return askClaudeWith(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5", prompt, opts);
+}
+
+async function askClaudeWith(model: string, prompt: string, opts: { images?: ImageIn[]; maxTokens?: number; json?: boolean }) {
   const content: Array<Anthropic.Messages.ImageBlockParam | Anthropic.Messages.TextBlockParam> = [
     ...(opts.images || []).map((img) => ({ type: "image" as const, source: { type: "base64" as const, media_type: img.media_type, data: img.data } })),
     { type: "text" as const, text: prompt },
@@ -24,7 +36,7 @@ export async function askClaude(prompt: string, opts: { images?: ImageIn[]; maxT
   let res: Anthropic.Messages.Message;
   try {
     res = await anthropic().messages.create({
-      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
+      model,
       max_tokens: opts.maxTokens ?? 4000,
       system: opts.json
         ? "You are Evee, an assistant inside the Evee Studio app for TikTok Shop creators. Your reply is parsed by a program: reply with exactly one JSON value and nothing else."

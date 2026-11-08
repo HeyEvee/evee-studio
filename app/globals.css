@@ -352,3 +352,16 @@ section.first{margin-top:16px}
 input[type=date]{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;max-width:100%;min-height:46px;text-align:left}
 input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
 .field{min-width:0}
+/* See it with my product */
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:360px){.row2{grid-template-columns:1fr}}
+.hint{font-weight:400;color:var(--muted);font-size:12px}
+.fw .btns{margin-top:4px}
+.tl{gap:14px}
+.tl .fit{margin:0;font-size:15px}
+.tl .hookbox p{margin:0}
+.beats{margin:0;padding:0;list-style:none;counter-reset:b;display:grid;gap:12px}
+.beats li{counter-increment:b;position:relative;padding-left:36px;display:grid;gap:4px}
+.beats li::before{content:counter(b);position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font:700 13px var(--display)}
+.beats p{margin:0;font-size:15px}
+.beats .k{display:inline-block;min-width:42px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}

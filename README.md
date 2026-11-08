@@ -5,7 +5,7 @@
 - **Home:** greets you with your top 5–10 best sellers for Yesterday, 7 days or 30 days: GMV, units, videos posted, GMV per video and the change vs the period before. "Retarget today" picks out the best return per video, sellers with no new videos, and products on a streak.
 - **Log sales:** from TikTok Shop screenshots (several at once; Evee reads them and you check) or by typing product, units, GMV and videos.
 - **Products:** every product ranked for the period, searchable. Tap one for its daily chart, video count and + / − for videos posted today or yesterday.
-- **Frameworks:** 21 proven viral video structures plus the conversion formula (Hook → Pain point → Solution → CTA) to study and copy.
+- **Frameworks:** 21 proven viral video structures plus the conversion formula (Hook → Pain point → Solution → CTA) to study and copy **See it with my product** walks one framework through beat by beat for a product (hook, what to show, an example line). Uses the cheaper fast model (`ANTHROPIC_FAST_MODEL`, default `claude-haiku-5-5`, falls back to the main model) and saves each walkthrough so reopening it is free.
 - **You:** name, sign out.
 
 Private beta: invite-only, free.
@@ -17,7 +17,7 @@ Private beta: invite-only, free.
 | Next.js 14 on Vercel | The app, login and API |
 | Supabase Auth | Email + 8-digit code sign-in, invite-only |
 | Supabase Postgres | `docs` (each person's private data: profile, products, sales days, video counts), `ai_calls` (daily limits) |
-| Anthropic Claude (`lib/claude.ts`) | Reads sales screenshots |
+| Anthropic Claude (`lib/claude.ts`) | Reads sales screenshots; framework walkthroughs |
 | `/api/evee` | The only way the app reaches the AI. Prompts live on the server (`lib/studio.ts`, the screenshot-reading prompt). The key never reaches the phone. |
 
 Key files: `lib/playbook.ts` (Evee's conversion playbook: Hook → Pain point → Solution → CTA, persuasion principles, pitfalls), `lib/library.ts` (the 21 frameworks: add one here), `lib/studio.ts` (everything Evee is told), `app/margo/app.js` (the screens), `supabase/schema.sql` (database). The "What to post today" suggestions are simple rules in `app.js` (`recommendations()`), so they're instant and free.

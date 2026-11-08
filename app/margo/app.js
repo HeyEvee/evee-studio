@@ -1,6 +1,6 @@
 // Evee Studio app screens. Plain DOM rendering, mounted by MargoMount.tsx.
 // Data: Supabase "docs" table (private per person). AI: /api/evee (prompts live on the server).
-import { FRAMEWORKS } from "@/lib/library";
+import { FRAMEWORKS, FW } from "@/lib/library";
 import { AFFIRMATIONS, affirmationIndex } from "@/lib/affirmations";
 import { SPINE, PRINCIPLES, PITFALLS } from "@/lib/playbook";
 
@@ -49,6 +49,7 @@ export function mount(root, { supabase, email }) {
   let userId = null, ready = false;
   const S = {
     err: "", busy: null, q: "", aff: 0,
+    tl: { fw: null, product: { name: "", price: "", audience: "" } }, tlCache: {},
     products: [], sales: {}, log: null, // log = { date, rows } while editing
     vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["0d", "1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
     profile: { name: "" }, profileRaw: {},
@@ -70,6 +71,7 @@ export function mount(root, { supabase, email }) {
       if (row.id === "profile") { S.profileRaw = v; S.profile = { name: String(v.name || "") }; }
       else if (row.id === "products") S.products = arr(v.list);
       else if (row.id.startsWith("sales-")) sales[row.id.slice(6)] = v;
+      else if (row.id === "tailored") S.tlCache = v.items && typeof v.items === "object" ? v.items : {};
       else if (row.id === "videos") S.vids = v.counts && typeof v.counts === "object" ? v.counts : {};
     }
     S.sales = sales; ready = true;
@@ -148,7 +150,7 @@ export function mount(root, { supabase, email }) {
   function back() { stack.pop(); if (!stack.length) stack = ["today"]; S.err = ""; render(); }
   function render(keep) {
     const y = window.scrollY, cur = stack[stack.length - 1];
-    view.innerHTML = cur.startsWith("p:") ? productView(cur.slice(2)) : cur === "log" ? logView() : ({ today, products: productsTab, frameworks, you }[cur] || today)();
+    view.innerHTML = cur.startsWith("p:") ? productView(cur.slice(2)) : cur === "log" ? logView() : ({ today, products: productsTab, frameworks, you, tailor: tailorView }[cur] || today)();
     const tabKey = ["today", "products", "frameworks"].includes(stack[0]) ? stack[0] : "";
     root.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.go === tabKey ? "page" : "false"));
     window.scrollTo(0, keep ? y : 0);
@@ -233,6 +235,7 @@ export function mount(root, { supabase, email }) {
     persist("videos", { counts: S.vids }, "your videos");
     if (!S.products.some((p) => norm(p.name) === k)) rememberProduct({ name: String(name).trim() });
   }
+  function setTlProduct(name) { const k = S.products.find((x) => norm(x.name) === norm(name)); S.tl.product = { name, price: k?.price || "", audience: k?.audience || "" }; }
   function setPeriod(p) { S.period = p; try { localStorage.setItem("evee.period", p); } catch {} render(true); }
   const periodSeg = () => `<div class="seg period">${Object.entries(PERIODS).filter(([k]) => k !== "0d" || todayLogged()).map(([k, [l]]) => `<button aria-pressed="${curPeriod() === k}" data-period="${k}">${l}</button>`).join("")}</div>`;
   const rangeLabel = (days) => (days.length === 1 ? fmtDay(days[0], { weekday: "long", month: "short", day: "numeric" }) : `${fmtDay(days[days.length - 1], { month: "short", day: "numeric" })} – ${fmtDay(days[0], { month: "short", day: "numeric" })}`);
@@ -304,7 +307,7 @@ export function mount(root, { supabase, email }) {
 
       ${picks.length ? `<section><div class="sechead"><h2>Retarget today</h2><small>from your numbers</small></div>
         ${picks.map((p) => `<div class="rt"><span class="chip ${p.chip[1]}">${p.chip[0]}</span><h2>${esc(p.r.name)}</h2><p class="why">${esc(p.why)}</p>
-          <div class="btns"><button class="btn small" data-prod="${esc(p.r.key)}">See its numbers</button><button class="btn ghost small" data-go="frameworks">Pick a framework</button></div></div>`).join("")}</section>` : ""}
+          <div class="btns"><button class="btn small" data-prod="${esc(p.r.key)}">See its numbers</button><button class="btn ghost small" data-fwfor="${esc(p.r.name)}">Pick a framework</button></div></div>`).join("")}</section>` : ""}
 
 
       <section><div class="sechead"><h2>Sales log</h2><button class="btn plain small" data-log="${dayKey()}">Log another day</button></div>
@@ -338,7 +341,7 @@ export function mount(root, { supabase, email }) {
         <div class="axis"><span>${fmtDay(span[0], { month: "short", day: "numeric" })}</span><span>${fmtDay(span[span.length - 1], { month: "short", day: "numeric" })}</span></div></div></section>
       <section><div class="card"><span class="label">Videos you posted</span>${stepper(dayKey(), "Today")}${stepper(Y, "Yesterday")}
         <p class="note">Marking a saved script Posted adds it here too.</p></div></section>
-      <section><button class="btn ghost" data-go="frameworks">Pick a framework for your next video</button></section>
+      <section><button class="btn ghost" data-fwfor="${esc(st.name)}">Pick a framework for your next video</button></section>
     </div>`;
   }
   function logView() {
@@ -409,14 +412,61 @@ export function mount(root, { supabase, email }) {
         <div class="whybox"><span class="label">Persuasion principles that drive sales</span><ul class="ul">${PRINCIPLES.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
         <div class="whybox"><span class="label">What kills conversions</span><ul class="ul">${PITFALLS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
       </details></section>
+      ${S.tl.product.name ? `<p class="forced">Showing frameworks for <b>${esc(S.tl.product.name)}</b> <button class="btn plain small" data-act="tlclear">Clear</button></p>` : ""}
       <section>${FRAMEWORKS.map((f) => `<details class="card fw"><summary><span><b>${esc(f.name)}</b><span class="note">${esc(f.oneLiner)}</span></span></summary>
         <p class="note"><b>Best for:</b> ${esc(f.bestFor)}</p>
         <ol class="ul">${f.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
         ${f.why ? `<div class="whybox"><span class="label">Why it works</span><ul class="ul">${f.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
         <p class="coachline"><b>Evee’s tip:</b> ${esc(f.coach)}</p>
         ${f.caution ? `<p class="flag note">${esc(f.caution)}</p>` : ""}
-        <button class="btn ghost small" data-copyfw="${f.id}">Copy this framework</button></details>`).join("")}</section>
+        <div class="btns"><button class="btn small" data-tailor="${f.id}">See it with ${S.tl.product.name ? esc(S.tl.product.name) : "my product"}</button><button class="btn ghost small" data-copyfw="${f.id}">Copy</button></div></details>`).join("")}</section>
     </div>`;
+  }
+
+  /* ================= SEE IT WITH MY PRODUCT ================= */
+  const tlKey = () => { const p = S.tl.product; return [S.tl.fw, norm(p.name), String(p.price || "").trim(), norm(p.audience)].join("|"); };
+  function tailorView() {
+    const f = FW[S.tl.fw]; if (!f) return frameworks();
+    const p = S.tl.product, res = S.tlCache[tlKey()];
+    const top = Object.values(productStats(periodDays("30d"))).filter((r) => r.units > 0 || (r.gmv || 0) > 0).sort((a, b) => (b.gmv || 0) - (a.gmv || 0) || b.units - a.units).map((r) => r.name);
+    const names = [...new Set([...top, ...S.products.map((x) => x.name)])].filter(Boolean).slice(0, 8);
+    return `<div class="fade"><button class="back" data-act="back">← Frameworks</button>
+      <p class="date">See it with my product</p><h1>${esc(f.name)}</h1>
+      <p class="lede">${esc(f.oneLiner)}</p>
+      <section><div class="card">
+        ${names.length ? `<span class="label">Your products</span><div class="chips">${names.map((n) => `<button class="opt" aria-pressed="${norm(n) === norm(p.name)}" data-tlpick="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : ""}
+        <div class="field"><label for="tn">Product</label><input type="text" id="tn" data-bind="tl.product.name" value="${esc(p.name)}" placeholder="e.g. Mini car vacuum"></div>
+        <div class="row2"><div class="field"><label for="tp">Price <span class="hint">optional</span></label><input type="text" inputmode="decimal" id="tp" data-bind="tl.product.price" value="${esc(p.price || "")}" placeholder="29.99"></div>
+        <div class="field"><label for="ta">Who it’s for <span class="hint">optional</span></label><input type="text" id="ta" data-bind="tl.product.audience" value="${esc(p.audience || "")}" placeholder="busy moms"></div></div>
+        ${busyIs("tailor") || res ? "" : `<button class="btn" data-act="tailor">Show me how it works</button>`}
+      </div></section>
+      ${busyIs("tailor") ? `<section>${busyCard()}</section>` : errBox()}
+      ${res && !busyIs("tailor") ? `<section><div class="card tl">
+        ${res.fit ? `<p class="fit">${esc(res.fit)}</p>` : ""}
+        <div class="hookbox"><span class="label">The hook</span>
+          ${res.hook?.say ? `<p><b>Say:</b> “${esc(res.hook.say)}”</p>` : ""}${res.hook?.onScreen ? `<p><b>On screen:</b> ${esc(res.hook.onScreen)}</p>` : ""}${res.hook?.visual ? `<p><b>Show:</b> ${esc(res.hook.visual)}</p>` : ""}</div>
+        <ol class="beats">${arr(res.beats).map((b) => `<li><b>${esc(b.beat || "")}</b>${b.show ? `<p><span class="k">Show</span> ${esc(b.show)}</p>` : ""}${b.say ? `<p><span class="k">Say</span> “${esc(b.say)}”</p>` : ""}</li>`).join("")}</ol>
+        ${res.tip ? `<p class="coachline"><b>Evee’s tip:</b> ${esc(res.tip)}</p>` : ""}
+        <p class="note">Example lines are a starting point. Say them your way, and swap in your real reaction where you see [brackets].</p>
+        <div class="btns"><button class="btn ghost small" data-act="tlcopy">Copy</button><button class="btn plain small" data-go="frameworks">Try another framework</button></div>
+      </div></section>` : ""}
+    </div>`;
+  }
+  async function runTailor() {
+    const p = S.tl.product;
+    if (!String(p.name || "").trim()) { S.err = "Add your product first."; render(true); return; }
+    const key = tlKey();
+    const out = await ask("tailor", `Showing how ${FW[S.tl.fw].name} works for ${p.name}…`, { action: "tailor", framework: S.tl.fw, product: { name: p.name, price: p.price, audience: p.audience, details: S.products.find((x) => norm(x.name) === norm(p.name))?.details || "" } });
+    if (out) {
+      S.tlCache[key] = { ...out, at: Date.now() };
+      const keep = Object.entries(S.tlCache).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 60);
+      S.tlCache = Object.fromEntries(keep);
+      persist("tailored", { items: S.tlCache }, "your walkthroughs"); rememberProduct({ name: String(p.name).trim(), price: p.price, audience: p.audience }); render(true); }
+  }
+  function tailorText() {
+    const r = S.tlCache[tlKey()], f = FW[S.tl.fw]; if (!r) return "";
+    return [`${f.name} for ${S.tl.product.name}`, r.fit, "", "HOOK", r.hook?.say && `Say: "${r.hook.say}"`, r.hook?.onScreen && `On screen: ${r.hook.onScreen}`, r.hook?.visual && `Show: ${r.hook.visual}`, "",
+      ...arr(r.beats).flatMap((b, i) => [`${i + 1}. ${b.beat || ""}`, b.show && `   Show: ${b.show}`, b.say && `   Say: "${b.say}"`]), "", r.tip && `Tip: ${r.tip}`].filter((x) => x != null && x !== false).join("\n");
   }
 
   /* ================= PRODUCTS ================= */
@@ -457,7 +507,7 @@ export function mount(root, { supabase, email }) {
     if (e.target.dataset.live) { const id = e.target.id, pos = e.target.selectionStart; render(true); view.firstElementChild?.classList.remove("fade"); const el = root.querySelector("#" + id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch {} } } });
   on("click", (e) => {
     if (!root.contains(e.target)) return;
-    const el = e.target.closest("[data-go],[data-act],[data-log],[data-rmrow],[data-period],[data-prod],[data-vid],[data-copyfw]");
+    const el = e.target.closest("[data-go],[data-act],[data-log],[data-rmrow],[data-period],[data-prod],[data-vid],[data-copyfw],[data-tailor],[data-tlpick],[data-fwfor]");
     if (!el) return; const d = el.dataset;
     if (d.go !== undefined) { if (d.go === "you") push("you"); else go(d.go); return; }
     if (d.log) { openLog(d.log); return; }
@@ -465,12 +515,18 @@ export function mount(root, { supabase, email }) {
     if (d.period) { setPeriod(d.period); return; }
     if (d.prod) { push("p:" + d.prod); return; }
     if (d.vid) { const [dt, by] = d.vid.split("|"), k = stack[stack.length - 1].slice(2); bumpVid(dt, nameFor(k), +by); render(true); return; }
+    if (d.tailor) { S.tl.fw = d.tailor; if (!S.tl.product.name) { const top = Object.values(productStats(periodDays("7d"))).sort((a, b) => (b.gmv || 0) - (a.gmv || 0) || b.units - a.units)[0]; if (top) setTlProduct(top.name); } push("tailor"); return; }
+    if (d.tlpick) { setTlProduct(d.tlpick); render(true); return; }
+    if (d.fwfor) { setTlProduct(d.fwfor); go("frameworks"); toast(`Open a framework and tap See it with ${d.fwfor}`); return; }
     if (d.copyfw) { const f = FRAMEWORKS.find((x) => x.id === d.copyfw); if (f) copy([f.name, f.oneLiner, "", "Best for: " + f.bestFor, "", ...f.steps.map((x, i) => `${i + 1}. ${x}`), "", "Tip: " + f.coach].join("\n")); return; }
     switch (d.act) {
       case "back": back(); break;
       case "stop": S.busy?.ctl.abort(); break;
       case "nextaff": S.aff = (S.aff + 1) % AFFIRMATIONS.length || 1; render(true); break;
       case "copyaff": copy(AFFIRMATIONS[(affirmationIndex(dayKey()) + S.aff) % AFFIRMATIONS.length]); break;
+      case "tailor": runTailor(); break;
+      case "tlcopy": copy(tailorText()); break;
+      case "tlclear": S.tl.product = { name: "", price: "", audience: "" }; render(true); break;
       case "showall": S.showAll = !S.showAll; render(true); break;
       case "addrow": S.log.rows.push(blankRow()); render(true); root.querySelector(`#lr${S.log.rows.length - 1}n`)?.focus(); break;
       case "savelog": saveLog(); break;
