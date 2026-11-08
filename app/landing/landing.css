@@ -89,3 +89,11 @@
 .lp-hero .lp-phone::before{display:none}
 @media (min-width:880px){.lp-hero .lp-phone::before{display:block}}
 .lp-hero .lp-phone{margin-top:8px}
+.lp-nav nav{gap:10px}
+.lp-navlink{margin-right:6px}
+.lp-signup{padding:8px 14px;border-radius:999px;background:var(--accent);color:var(--on-accent)!important;border:1px solid var(--accent)}
+@media (max-width:520px){.lp-navlink{display:none}.lp-nav nav{font-size:14px}.lp-signin,.lp-signup{padding:7px 12px}}
+@media (max-width:350px){.lp-nav .brand{font-size:16px}.lp-signin,.lp-signup{padding:6px 10px}}
+.lp-nav .brand,.lp-signin,.lp-signup{white-space:nowrap}
+.lp-short{display:none}
+@media (max-width:370px){.lp-full{display:none}.lp-short{display:inline}.lp-nav nav{gap:6px;font-size:13px}}

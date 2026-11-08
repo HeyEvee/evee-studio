@@ -22,7 +22,7 @@ export default function Landing({ foundingLeft, notice }: { foundingLeft: number
     <div className="lp">
       <header className="lp-nav">
         <a href="/" className="brand">Evee <span>Studio</span></a>
-        <nav><a href="#pricing">Pricing</a><a href="/login" className="lp-signin">Sign in</a></nav>
+        <nav><a href="#pricing" className="lp-navlink">Pricing</a><a href="/login" className="lp-signin">Sign in</a><a href="#pricing" className="lp-signup"><span className="lp-full">Start free trial</span><span className="lp-short">Free trial</span></a></nav>
       </header>
 
       <main>
