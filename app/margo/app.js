@@ -249,7 +249,7 @@ export function mount(root, { supabase, email }) {
         <p class="note">In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales. Drop them here and Evee builds your planner: your top sellers, how many videos you made for each, and the GMV they brought in.</p>
         ${dropBtn(Y)}</div></section>
       <section class="example"><div class="sechead"><h2>Your top sellers</h2><span class="pill warn">Example</span></div>
-        <div class="list">${[["Mini car vacuum", 1240, 41, 6, "streak"], ["Silk pillowcase", 860, 22, 3, ""], ["Shapewear bodysuit", 610, 14, 1, "new"]].map(([n, g, u, v, t], i) => `<div class="prow"><span class="rank">${i + 1}</span><span class="name">${n} ${t ? `<span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}<div class="meta">${v} video${v > 1 ? "s" : ""} · ${money(g / v)} per video</div><span class="bar"><i style="width:${Math.round((g / 1240) * 100)}%"></i></span></span><span class="num">${money(g)}<small class="meta">${u} sold</small></span></div>`).join("")}</div></section>
+        <div class="list">${[["Mini car vacuum", 1240, 41, 6, "streak"], ["Silk pillowcase", 860, 22, 3, ""], ["Shapewear bodysuit", 610, 14, 1, "new"]].map(([n, g, u, v, t], i) => `<div class="prow"><span class="rank">${i + 1}</span><span class="name">${n} ${t ? `<span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}<div class="meta">${v} video${v > 1 ? "s" : ""} · ${money(g / v)} GMV per video</div><span class="bar"><i style="width:${Math.round((g / 1240) * 100)}%"></i></span></span><span class="num">${money(g)}<small class="meta">GMV · ${u} sold</small></span></div>`).join("")}</div></section>
     </div>`;
 
     const rows = Object.values(cur).filter((r) => r.units > 0 || (r.gmv || 0) > 0);
@@ -263,9 +263,9 @@ export function mount(root, { supabase, email }) {
     // Retarget picks: best return per video, and sellers with no new videos.
     const picks = [];
     const best = rows.filter((r) => perVideo(r) != null && r.gmv > 0).sort((a, b) => perVideo(b) - perVideo(a))[0];
-    if (best) picks.push({ r: best, chip: ["Best return per video", "streak"], why: `${money(perVideo(best))} per video from ${best.videos} video${best.videos > 1 ? "s" : ""}. Post another one while it’s working.` });
+    if (best) picks.push({ r: best, chip: ["Best GMV per video", "streak"], why: `${money(perVideo(best))} GMV per video from ${best.videos} video${best.videos > 1 ? "s" : ""}. Post another one while it’s working.` });
     const quiet = anyVids && rows.find((r) => r.videos === 0 && r !== best);
-    if (quiet) picks.push({ r: quiet, chip: ["No new videos", "quiet"], why: `${useG ? money(quiet.gmv) : quiet.units + " sold"} with no new videos ${per === "1d" ? "yesterday" : "this period"}. A fresh video could push it further.` });
+    if (quiet) picks.push({ r: quiet, chip: ["No new videos", "quiet"], why: `${useG ? money(quiet.gmv) + " GMV" : quiet.units + " sold"} with no new videos ${per === "1d" ? "yesterday" : "this period"}. A fresh video could push it further.` });
     const hot = rows.find((r) => ["streak", "jump", "new"].includes(tags[r.key]) && !picks.some((p) => p.r === r));
     if (hot) picks.push({ r: hot, chip: TAG[tags[hot.key]], why: recommendations().find((x) => norm(x.name) === hot.key)?.why || "" });
 
@@ -288,9 +288,9 @@ export function mount(root, { supabase, email }) {
         ${rows.length ? `<div class="list">${shown.map((r, i) => { const pr = prev[r.key], d = pr ? pct(val(r), val(pr)) : null, t = tags[r.key];
           return `<button class="prow" data-prod="${esc(r.key)}"><span class="rank">${i + 1}</span>
             <span class="name">${esc(r.name)}${t && t !== "steady" ? ` <span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}
-              <div class="meta">${r.videos} video${r.videos === 1 ? "" : "s"}${perVideo(r) != null ? ` · ${money(perVideo(r))} per video` : ""}${d != null ? ` · ${delta(d)}` : ""}</div>
+              <div class="meta">${r.videos} video${r.videos === 1 ? "" : "s"}${perVideo(r) != null ? ` · ${money(perVideo(r))} GMV per video` : ""}${d != null ? ` · ${delta(d)}` : ""}</div>
               <span class="bar"><i style="width:${Math.max(3, Math.round((val(r) / max) * 100))}%"></i></span></span>
-            <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>
+            <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `GMV · ${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>
           ${rows.length > 5 ? `<button class="btn plain small" data-act="showall">${S.showAll ? "Show top 5" : `Show top ${Math.min(10, rows.length)}`}</button>` : ""}`
         : `<div class="card empty">No sales logged ${per === "1d" ? "for yesterday" : "in this period"} yet.<br><br><button class="btn" data-log="${Y}">Log yesterday’s sales</button></div>`}
       </section>
@@ -426,8 +426,8 @@ export function mount(root, { supabase, email }) {
         ${list.length ? `<div class="list">${list.map((r, i) => { const pr = prev[r.key], d = pr ? pct(val(r), val(pr)) : null, t = tags[r.key];
           return `<button class="prow" data-prod="${esc(r.key)}"><span class="rank">${i + 1}</span>
             <span class="name">${esc(r.name)}${t && t !== "steady" ? ` <span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}
-              <div class="meta">${r.videos} video${r.videos === 1 ? "" : "s"}${perVideo(r) != null ? ` · ${money(perVideo(r))} per video` : ""}${d != null ? ` · ${delta(d)}` : ""}</div></span>
-            <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>`
+              <div class="meta">${r.videos} video${r.videos === 1 ? "" : "s"}${perVideo(r) != null ? ` · ${money(perVideo(r))} GMV per video` : ""}${d != null ? ` · ${delta(d)}` : ""}</div></span>
+            <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `GMV · ${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>`
           : `<div class="card empty">${q ? "No products match that." : `No sales logged ${per === "1d" ? "for yesterday" : "in this period"} yet.`}<br><br><button class="btn" data-log="${yesterday()}">Log sales</button></div>`}
       </section></div>`;
   }
