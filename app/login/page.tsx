@@ -13,7 +13,11 @@ export default function Login() {
   const [error, setError] = useState("");
   const supabase = createClient();
   const DOWN = "Evee can’t reach the sign-in service right now. Try again in a minute.";
-  useEffect(() => { if (new URLSearchParams(window.location.search).has("down")) setError(DOWN); }, []);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.has("down")) setError(DOWN);
+    if (q.get("email")) setEmail(q.get("email")!);
+  }, []);
 
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +31,7 @@ export default function Login() {
         /fetch|network|timed? ?out|load failed|50[234]|540/i.test(m) || (error as any).status >= 500
           ? DOWN
           : /signups? not allowed/i.test(m)
-          ? "That email isn’t on the Evee Studio beta list yet. Ask for an invite."
+          ? "We couldn’t find an Evee Studio account for that email. Use the email from checkout, or start a free trial on the home page."
           : /not authorized/i.test(m)
             ? "Sign-in emails aren’t set up yet (custom email sender is off in Supabase)."
             : /rate limit|security purposes/i.test(m)
@@ -59,7 +63,7 @@ export default function Login() {
         <h1>{step === "email" ? "Sign in" : "Check your email"}</h1>
         <p className="date">
           {step === "email"
-            ? "Evee Studio is in private beta. Use the email your invite went to."
+            ? "Use the email you subscribed or were invited with."
             : `We sent an 8-digit code to ${email}.`}
         </p>
       </div>
@@ -83,6 +87,7 @@ export default function Login() {
           <button type="button" className="btn plain" onClick={() => { setStep("email"); setCode(""); setError(""); }}>Use a different email or send a new code</button>
         </form>
       )}
+      <p className="date" style={{ textAlign: "center" }}>New here? <a href="/#pricing" style={{ color: "var(--accent)", fontWeight: 600 }}>Start a 7-day free trial</a></p>
     </main>
   );
 }

@@ -8,7 +8,12 @@
 - **Frameworks:** 21 proven viral video structures plus the conversion formula (Hook → Pain point → Solution → CTA) to study and copy **See it with my product** walks one framework through beat by beat for a product (hook, what to show, an example line). Uses the cheaper fast model (`ANTHROPIC_FAST_MODEL`, default `claude-haiku-5-5`, falls back to the main model) and saves each walkthrough so reopening it is free.
 - **You:** name, sign out.
 
-Private beta: invite-only, free.
+**Landing page and subscriptions:** signed-out visitors see the landing page at `/` with pricing (Founding $7/mo for the first 50, $12/mo, $99/yr, all with a 7-day free trial). Checkout is Stripe; after paying, `/welcome` and the Stripe webhook create the account and store the subscription status on it. Canceled subscribers see a "subscription ended" screen; people invited by hand (beta testers) always get in. "Manage subscription" (You) opens Stripe's billing portal.
+
+### Stripe setup
+1. Vercel env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, then redeploy. Prices are created in Stripe automatically on first checkout (lookup keys `evee_studio_founding_monthly`, `evee_studio_monthly`, `evee_studio_yearly`).
+2. Stripe → Developers → Webhooks → endpoint `https://<your domain>/api/stripe/webhook` with events `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`.
+3. Stripe → Settings → Billing → Customer portal: save it once (allow cancel, update payment method, switch between the Evee Studio prices).
 
 ## How it's built
 

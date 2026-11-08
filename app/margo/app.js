@@ -4,7 +4,7 @@ import { FRAMEWORKS, FW } from "@/lib/library";
 import { AFFIRMATIONS, affirmationIndex } from "@/lib/affirmations";
 import { SPINE, PRINCIPLES, PITFALLS } from "@/lib/playbook";
 
-export function mount(root, { supabase, email }) {
+export function mount(root, { supabase, email, billing = false }) {
   const listeners = new AbortController();
   const on = (type, fn) => document.addEventListener(type, fn, { signal: listeners.signal });
 
@@ -498,6 +498,7 @@ export function mount(root, { supabase, email }) {
       </div></section>
       <section><div class="card"><h2>Add Evee Studio to your home screen</h2>
         <p class="note"><b>iPhone:</b> open it in Safari, tap Share, then Add to Home Screen.<br><b>Android:</b> open it in Chrome, tap ⋮, then Install app.</p></div></section>
+      ${billing ? `<section><div class="card"><h2>Your subscription</h2><p class="note">Change your plan, update your card or cancel.</p><form method="post" action="/api/portal"><button class="btn ghost">Manage subscription</button></form></div></section>` : ""}
       <section><form method="post" action="/auth/signout" class="signout"><button class="btn plain">Sign out</button></form></section>
     </div>`;
   }
