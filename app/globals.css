@@ -348,3 +348,7 @@ button.prow:hover{background:var(--sunk)}
 .banner.done{background:var(--good-soft);border-color:transparent}
 .banner.done>span:last-child{color:var(--good)}
 section.first{margin-top:16px}
+/* iPhone Safari gives date inputs a fixed native width that overflows the card */
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;max-width:100%;min-height:46px;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
+.field{min-width:0}
