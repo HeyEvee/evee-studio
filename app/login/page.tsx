@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-// Email + 6-digit code (not a magic link), so signing in works inside the
+// Email + 8-digit code (not a magic link), so signing in works inside the
 // home-screen app on iPhone, where links open in Safari instead.
 export default function Login() {
   const [step, setStep] = useState<"email" | "code">("email");
@@ -12,6 +12,8 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const supabase = createClient();
+  const DOWN = "Evee can’t reach the sign-in service right now. Try again in a minute.";
+  useEffect(() => { if (new URLSearchParams(window.location.search).has("down")) setError(DOWN); }, []);
 
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -22,7 +24,9 @@ export default function Login() {
     if (error) {
       const m = error.message || "";
       setError(
-        /signups? not allowed/i.test(m)
+        /fetch|network|timed? ?out|load failed|50[234]|540/i.test(m) || (error as any).status >= 500
+          ? DOWN
+          : /signups? not allowed/i.test(m)
           ? "That email isn’t on the Evee Studio beta list yet. Ask for an invite."
           : /not authorized/i.test(m)
             ? "Sign-in emails aren’t set up yet (custom email sender is off in Supabase)."
