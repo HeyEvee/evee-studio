@@ -50,7 +50,7 @@ export function mount(root, { supabase, email }) {
   const S = {
     err: "", busy: null, q: "", aff: 0,
     products: [], sales: {}, log: null, // log = { date, rows } while editing
-    vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
+    vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["0d", "1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
     profile: { name: "" }, profileRaw: {},
   };
 
@@ -199,8 +199,15 @@ export function mount(root, { supabase, email }) {
     return `<span class="spark" aria-hidden="true">${vals.map((v, i) => `<i style="height:${Math.max(6, Math.round((v / max) * 100))}%" class="${i === vals.length - 1 ? "last" : ""}${v ? "" : " zero"}"></i>`).join("")}</span>`;
   }
   /* ---------- planner: periods, per-product stats, videos ---------- */
-  const PERIODS = { "1d": ["Yesterday", 1, "vs the day before"], "7d": ["7 days", 7, "vs the 7 days before"], "30d": ["30 days", 30, "vs the 30 days before"] };
-  const periodDays = (per, back = 0) => { const n = PERIODS[per][1], Y = yesterday(); return [...Array(n)].map((_, i) => addDays(Y, -(back * n) - i)); };
+  const PERIODS = { "0d": ["Today", 1, "vs yesterday"], "1d": ["Yesterday", 1, "vs the day before"], "7d": ["7 days", 7, "vs the 7 days before"], "30d": ["30 days", 30, "vs the 30 days before"] };
+  // "Today" shows only once today has been logged. Yesterday, 7 and 30 days use full days, so a half-finished today never drags the totals down.
+  const todayLogged = () => !!S.sales[dayKey()];
+  const curPeriod = () => (S.period === "0d" && !todayLogged() ? "1d" : S.period);
+  const periodDays = (per, back = 0) => {
+    const n = PERIODS[per][1], end = per === "0d" ? dayKey() : yesterday();
+    return [...Array(n)].map((_, i) => addDays(end, -(back * n) - i));
+  };
+  const periodWord = (per) => (per === "0d" ? "today" : per === "1d" ? "yesterday" : "this period");
   const vidsOn = (d, k) => num(S.vids[d]?.[k]) || 0;
   const nameFor = (k) => S.products.find((p) => norm(p.name) === k)?.name || salesByProduct()[k]?.name || k;
   function productStats(days) {
@@ -227,7 +234,7 @@ export function mount(root, { supabase, email }) {
     if (!S.products.some((p) => norm(p.name) === k)) rememberProduct({ name: String(name).trim() });
   }
   function setPeriod(p) { S.period = p; try { localStorage.setItem("evee.period", p); } catch {} render(true); }
-  const periodSeg = () => `<div class="seg period">${Object.entries(PERIODS).map(([k, [l]]) => `<button aria-pressed="${S.period === k}" data-period="${k}">${l}</button>`).join("")}</div>`;
+  const periodSeg = () => `<div class="seg period">${Object.entries(PERIODS).filter(([k]) => k !== "0d" || todayLogged()).map(([k, [l]]) => `<button aria-pressed="${curPeriod() === k}" data-period="${k}">${l}</button>`).join("")}</div>`;
   const rangeLabel = (days) => (days.length === 1 ? fmtDay(days[0], { weekday: "long", month: "short", day: "numeric" }) : `${fmtDay(days[days.length - 1], { month: "short", day: "numeric" })} – ${fmtDay(days[0], { month: "short", day: "numeric" })}`);
 
   const dropBtn = (Y) => `<div class="dropwrap"><label class="dropbtn"><input type="file" id="homeshots" accept="image/*" multiple>
@@ -235,7 +242,7 @@ export function mount(root, { supabase, email }) {
       <span><b>Drop yesterday’s stats</b><span>Upload your TikTok Shop screenshots</span></span></label>
       <button class="btn plain small" data-log="${Y}">or type them in</button></div>`;
   function today() {
-    const Y = yesterday(), per = S.period, days = periodDays(per);
+    const Y = yesterday(), per = curPeriod(), days = periodDays(per);
     const cur = productStats(days), prev = productStats(periodDays(per, 1));
     const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
     const hasAny = Object.keys(S.sales).length > 0;
@@ -265,7 +272,7 @@ export function mount(root, { supabase, email }) {
     const best = rows.filter((r) => perVideo(r) != null && r.gmv > 0).sort((a, b) => perVideo(b) - perVideo(a))[0];
     if (best) picks.push({ r: best, chip: ["Best GMV per video", "streak"], why: `${money(perVideo(best))} GMV per video from ${best.videos} video${best.videos > 1 ? "s" : ""}. Post another one while it’s working.` });
     const quiet = anyVids && rows.find((r) => r.videos === 0 && r !== best);
-    if (quiet) picks.push({ r: quiet, chip: ["No new videos", "quiet"], why: `${useG ? money(quiet.gmv) + " GMV" : quiet.units + " sold"} with no new videos ${per === "1d" ? "yesterday" : "this period"}. A fresh video could push it further.` });
+    if (quiet) picks.push({ r: quiet, chip: ["No new videos", "quiet"], why: `${useG ? money(quiet.gmv) + " GMV" : quiet.units + " sold"} with no new videos ${periodWord(per)}. A fresh video could push it further.` });
     const hot = rows.find((r) => ["streak", "jump", "new"].includes(tags[r.key]) && !picks.some((p) => p.r === r));
     if (hot) picks.push({ r: hot, chip: TAG[tags[hot.key]], why: recommendations().find((x) => norm(x.name) === hot.key)?.why || "" });
 
@@ -292,7 +299,7 @@ export function mount(root, { supabase, email }) {
               <span class="bar"><i style="width:${Math.max(3, Math.round((val(r) / max) * 100))}%"></i></span></span>
             <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `GMV · ${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>
           ${rows.length > 5 ? `<button class="btn plain small" data-act="showall">${S.showAll ? "Show top 5" : `Show top ${Math.min(10, rows.length)}`}</button>` : ""}`
-        : `<div class="card empty">No sales logged ${per === "1d" ? "for yesterday" : "in this period"} yet.<br><br><button class="btn" data-log="${Y}">Log yesterday’s sales</button></div>`}
+        : `<div class="card empty">No sales logged ${per === "0d" || per === "1d" ? "for " + periodWord(per) : "in this period"} yet.<br><br><button class="btn" data-log="${Y}">Log yesterday’s sales</button></div>`}
       </section>
 
       ${picks.length ? `<section><div class="sechead"><h2>Retarget today</h2><small>from your numbers</small></div>
@@ -307,7 +314,7 @@ export function mount(root, { supabase, email }) {
   }
 
   function productView(k) {
-    const per = S.period, days = periodDays(per), Y = yesterday();
+    const per = curPeriod(), days = periodDays(per), Y = yesterday();
     const st = productStats(days)[k] || { key: k, name: nameFor(k), units: 0, gmv: null, videos: 0 };
     const pv = productStats(periodDays(per, 1))[k];
     const P = salesByProduct()[k] || { byDay: {}, rev: {} };
@@ -414,7 +421,7 @@ export function mount(root, { supabase, email }) {
 
   /* ================= PRODUCTS ================= */
   function productsTab() {
-    const per = S.period, days = periodDays(per), cur = productStats(days), prev = productStats(periodDays(per, 1));
+    const per = curPeriod(), days = periodDays(per), cur = productStats(days), prev = productStats(periodDays(per, 1));
     const rows = Object.values(cur).filter((r) => r.units > 0 || (r.gmv || 0) > 0 || r.videos > 0);
     const useG = rows.some((r) => (r.gmv || 0) > 0), val = (r) => (useG ? r.gmv || 0 : r.units);
     rows.sort((a, b) => val(b) - val(a) || b.units - a.units || b.videos - a.videos);
@@ -428,7 +435,7 @@ export function mount(root, { supabase, email }) {
             <span class="name">${esc(r.name)}${t && t !== "steady" ? ` <span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}
               <div class="meta">${r.videos} video${r.videos === 1 ? "" : "s"}${perVideo(r) != null ? ` · ${money(perVideo(r))} GMV per video` : ""}${d != null ? ` · ${delta(d)}` : ""}</div></span>
             <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `GMV · ${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>`
-          : `<div class="card empty">${q ? "No products match that." : `No sales logged ${per === "1d" ? "for yesterday" : "in this period"} yet.`}<br><br><button class="btn" data-log="${yesterday()}">Log sales</button></div>`}
+          : `<div class="card empty">${q ? "No products match that." : `No sales logged ${per === "0d" || per === "1d" ? "for " + periodWord(per) : "in this period"} yet.`}<br><br><button class="btn" data-log="${yesterday()}">Log sales</button></div>`}
       </section></div>`;
   }
 
