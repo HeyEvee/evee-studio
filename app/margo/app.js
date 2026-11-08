@@ -424,7 +424,7 @@ export function mount(root, { supabase, email, billing = false }) {
   }
 
   /* ================= SEE IT WITH MY PRODUCT ================= */
-  const tlKey = () => { const p = S.tl.product; return [S.tl.fw, norm(p.name), String(p.price || "").trim(), norm(p.audience)].join("|"); };
+  const tlKey = () => { const p = S.tl.product; return ["v2", S.tl.fw, norm(p.name), String(p.price || "").trim(), norm(p.audience)].join("|"); };
   function tailorView() {
     const f = FW[S.tl.fw]; if (!f) return frameworks();
     const p = S.tl.product, res = S.tlCache[tlKey()];
@@ -443,11 +443,13 @@ export function mount(root, { supabase, email, billing = false }) {
       ${busyIs("tailor") ? `<section>${busyCard()}</section>` : errBox()}
       ${res && !busyIs("tailor") ? `<section><div class="card tl">
         ${res.fit ? `<p class="fit">${esc(res.fit)}</p>` : ""}
-        <div class="hookbox"><span class="label">The hook</span>
-          ${res.hook?.say ? `<p><b>Say:</b> “${esc(res.hook.say)}”</p>` : ""}${res.hook?.onScreen ? `<p><b>On screen:</b> ${esc(res.hook.onScreen)}</p>` : ""}${res.hook?.visual ? `<p><b>Show:</b> ${esc(res.hook.visual)}</p>` : ""}</div>
-        <ol class="beats">${arr(res.beats).map((b) => `<li><b>${esc(b.beat || "")}</b>${b.show ? `<p><span class="k">Show</span> ${esc(b.show)}</p>` : ""}${b.say ? `<p><span class="k">Say</span> “${esc(b.say)}”</p>` : ""}</li>`).join("")}</ol>
+        <span class="label">3 hooks to try</span>
+        <div class="hooks">${arr(res.hooks).map((h, i) => `<div class="hookbox"><span class="hstyle">${i + 1}. ${esc(h.style || "Hook")}</span>
+          ${h.visual ? `<p><b>Show:</b> ${esc(h.visual)}</p>` : ""}${h.say ? `<p><b>Say:</b> “${esc(h.say)}”</p>` : ""}${h.onScreen ? `<p><b>On screen:</b> ${esc(h.onScreen)}</p>` : ""}</div>`).join("")}</div>
+        <span class="label">The structure</span>
+        <ol class="beats">${arr(res.beats).map((b) => `<li><b>${esc(b.beat || "")}</b>${b.show ? `<p><span class="k">Show</span> ${esc(b.show)}</p>` : ""}${b.talk ? `<p><span class="k">Talk about</span> ${esc(b.talk)}</p>` : ""}${b.why ? `<p class="bwhy">${esc(b.why)}</p>` : ""}</li>`).join("")}</ol>
         ${res.tip ? `<p class="coachline"><b>Evee’s tip:</b> ${esc(res.tip)}</p>` : ""}
-        <p class="note">Example lines are a starting point. Say them your way, and swap in your real reaction where you see [brackets].</p>
+        <p class="note">These are talking points, not a script. Say it your way, in your own words, so your video sounds like you.</p>
         <div class="btns"><button class="btn ghost small" data-act="tlcopy">Copy</button><button class="btn plain small" data-go="frameworks">Try another framework</button></div>
       </div></section>` : ""}
     </div>`;
@@ -465,8 +467,8 @@ export function mount(root, { supabase, email, billing = false }) {
   }
   function tailorText() {
     const r = S.tlCache[tlKey()], f = FW[S.tl.fw]; if (!r) return "";
-    return [`${f.name} for ${S.tl.product.name}`, r.fit, "", "HOOK", r.hook?.say && `Say: "${r.hook.say}"`, r.hook?.onScreen && `On screen: ${r.hook.onScreen}`, r.hook?.visual && `Show: ${r.hook.visual}`, "",
-      ...arr(r.beats).flatMap((b, i) => [`${i + 1}. ${b.beat || ""}`, b.show && `   Show: ${b.show}`, b.say && `   Say: "${b.say}"`]), "", r.tip && `Tip: ${r.tip}`].filter((x) => x != null && x !== false).join("\n");
+    return [`${f.name} for ${S.tl.product.name}`, r.fit, "", "HOOKS TO TRY", ...arr(r.hooks).flatMap((h, i) => [`${i + 1}. ${h.style || "Hook"}`, h.visual && `   Show: ${h.visual}`, h.say && `   Say: "${h.say}"`, h.onScreen && `   On screen: ${h.onScreen}`]), "", "THE STRUCTURE",
+      ...arr(r.beats).flatMap((b, i) => [`${i + 1}. ${b.beat || ""}`, b.show && `   Show: ${b.show}`, b.talk && `   Talk about: ${b.talk}`]), "", r.tip && `Tip: ${r.tip}`].filter((x) => x != null && x !== false).join("\n");
   }
 
   /* ================= PRODUCTS ================= */

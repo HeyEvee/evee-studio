@@ -50,10 +50,11 @@ export async function POST(req: Request) {
       const p = { name: str(body?.product?.name, 200), price: str(body?.product?.price, 40), audience: str(body?.product?.audience, 400), details: str(body?.product?.details, 1000) };
       if (!p.name) return fail(400, "bad_request", "Add your product first.");
       await spendAllowance(supabase, "tailor");
-      const out: any = await askClaude(tailorPrompt(fw, p), { json: true, maxTokens: 1800, fast: true });
-      const beats = (Array.isArray(out?.beats) ? out.beats : []).filter((b: any) => b && (b.show || b.say)).slice(0, 10);
+      const out: any = await askClaude(tailorPrompt(fw, p), { json: true, maxTokens: 2200, fast: true });
+      const beats = (Array.isArray(out?.beats) ? out.beats : []).filter((b: any) => b && (b.show || b.talk)).slice(0, 10);
+      const hooks = (Array.isArray(out?.hooks) ? out.hooks : []).filter((h: any) => h && (h.visual || h.say)).slice(0, 3);
       if (!beats.length) throw new MargoError("invalid_json", "Evee’s walkthrough came back incomplete. Try again.", 502);
-      return NextResponse.json({ result: { fit: out.fit || "", hook: out.hook || {}, beats, tip: out.tip || "" } });
+      return NextResponse.json({ result: { v: 2, fit: out.fit || "", hooks, beats, tip: out.tip || "" } });
     } catch (e: any) {
       if (e instanceof MargoError) return fail(e.status, e.code, e.message);
       console.error("evee tailor error", e);
