@@ -133,13 +133,14 @@ export function mount(root, { supabase, email, billing = false }) {
     if (!S.log) return;
     const out = { rows: all, date, note: notes.join(" ") };
     const typed = L.rows.filter((r) => String(r.name || "").trim());
-    const found = arr(out.rows).map((r) => ({ name: r.name, units: r.units ?? "", revenue: r.revenue ?? "", videos: r.videos ?? "" }));
+    const found = arr(out.rows).map((r) => ({ name: r.name, units: r.units ?? "", revenue: r.revenue ?? "", videos: (L.rows.find((x) => norm(x.name) === norm(r.name)) || {}).videos ?? "" }));
     const keep = typed.filter((r) => !found.some((f) => norm(f.name) === norm(r.name)));
     L.rows = [...found, ...keep];
     if (out.date && out.date !== L.date && !S.sales[out.date]) L.date = out.date;
     L.read = { count: found.length, note: out.note || "" };
     render(true);
-    toast(`Found ${found.length} product${found.length === 1 ? "" : "s"}. Check them, then Save.`);
+    const blanks = found.filter((r) => r.units === "").length;
+    toast(`Found ${found.length} product${found.length === 1 ? "" : "s"}.${blanks ? ` ${blanks} need${blanks === 1 ? "s" : ""} a sold number (highlighted).` : " Check them, then Save."}`);
   }
   const busyCard = () => `<div class="card"><div class="thinking"><div class="dots"><i></i><i></i><i></i></div><div><b>${esc(S.busy.label)}</b><p class="note">Usually 20–40 seconds.</p></div></div><button class="btn plain" data-act="stop">Stop</button></div>`;
   const errBox = () => (S.err ? `<p class="err">${esc(S.err)}</p>` : "");
@@ -363,13 +364,13 @@ export function mount(root, { supabase, email, billing = false }) {
         <datalist id="known">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
         ${L.rows.map((r, i) => `<div class="logrow">
           <div class="field"><label for="lr${i}n">Product</label><input type="text" id="lr${i}n" list="known" data-bind="log.rows.${i}.name" value="${esc(r.name)}" placeholder="Product name"></div>
-          <div class="field"><label for="lr${i}u">Sold</label><input type="text" inputmode="numeric" id="lr${i}u" data-bind="log.rows.${i}.units" value="${esc(r.units)}" placeholder="12"></div>
-          <div class="field"><label for="lr${i}r">GMV $</label><input type="text" inputmode="decimal" id="lr${i}r" data-bind="log.rows.${i}.revenue" value="${esc(r.revenue)}" placeholder="240"></div>
-          <div class="field"><label for="lr${i}v">Videos</label><input type="text" inputmode="numeric" id="lr${i}v" data-bind="log.rows.${i}.videos" value="${esc(r.videos ?? "")}" placeholder="0"></div>
+          <div class="field"><label for="lr${i}u">Sold</label><input type="text" inputmode="numeric" id="lr${i}u" data-bind="log.rows.${i}.units" value="${esc(r.units)}" placeholder="—"${L.tried && num(r.units) == null && num(r.revenue) == null && String(r.name || "").trim() ? ' class="missing" aria-invalid="true"' : num(r.units) == null && String(r.name || "").trim() ? ' class="blank"' : ""}></div>
+          <div class="field"><label for="lr${i}r">GMV $</label><input type="text" inputmode="decimal" id="lr${i}r" data-bind="log.rows.${i}.revenue" value="${esc(r.revenue)}" placeholder="—"${L.tried && num(r.units) == null && num(r.revenue) == null && String(r.name || "").trim() ? ' class="missing" aria-invalid="true"' : ""}></div>
+          <div class="field"><label for="lr${i}v">Videos posted</label><input type="text" inputmode="numeric" id="lr${i}v" data-bind="log.rows.${i}.videos" value="${esc(r.videos ?? "")}" placeholder="—"></div>
           ${L.rows.length > 1 ? `<button class="x" data-rmrow="${i}" aria-label="Remove row">×</button>` : `<span></span>`}
         </div>`).join("")}
         <button class="btn ghost small" data-act="addrow">+ Add product</button>
-        <p class="note">Videos = how many you posted for that product that day. That’s how Evee works out GMV per video.</p>
+        <p class="note"><b>Videos posted</b> = how many new videos you posted for that product that day (leave it blank if none). Sales from your older videos still count in GMV.</p>
         ${errBox()}
         <button class="btn" data-act="savelog">Save</button>
         ${S.sales[L.orig] ? `<button class="btn plain" data-act="dellog">Delete this day</button>` : ""}
@@ -386,7 +387,13 @@ export function mount(root, { supabase, email, billing = false }) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(L.date)) { S.err = "Pick a day."; render(true); return; }
     const rows = L.rows.map((r) => ({ name: String(r.name || "").trim(), units: num(r.units), revenue: num(r.revenue) })).filter((r) => r.name);
     if (!rows.length) { S.err = "Add at least one product."; render(true); return; }
-    if (rows.some((r) => r.units == null)) { S.err = "Add how many sold for each product (0 is fine)."; render(true); return; }
+    const gap = rows.find((r) => r.units == null && r.revenue == null);
+    if (gap) {
+      L.tried = true; S.err = `Add how many sold or the GMV for ${gap.name} (0 is fine), or remove it with ×.`; render(true);
+      const i = L.rows.findIndex((r) => String(r.name || "").trim() === gap.name);
+      const el = root.querySelector(`#lr${i}u`); el?.scrollIntoView({ block: "center", behavior: "smooth" }); el?.focus({ preventScroll: true });
+      return;
+    }
     const doc = { date: L.date, rows, updatedAt: new Date().toISOString() };
     if (L.orig !== L.date && S.sales[L.orig]) { delete S.sales[L.orig]; delDoc("sales-" + L.orig).catch(() => {}); }
     S.sales[L.date] = doc;

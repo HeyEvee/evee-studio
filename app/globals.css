@@ -370,3 +370,5 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
 .hstyle{font:700 14px var(--display);color:var(--accent)}
 .beats .k{min-width:0;margin-right:6px}
 .bwhy{font-size:13px!important;color:var(--muted)}
+.logrow input.blank{border-color:var(--warn);border-style:dashed}
+.logrow input.missing{border-color:var(--warn);border-width:2px;background:var(--warn-soft)}
