@@ -3,10 +3,11 @@ import { FW } from "./library";
 
 // What Evee is told when she reads sales screenshots. Lives on the server.
 
-export function readSalesPrompt(today: string, known: string[]) {
+export function readSalesPrompt(today: string, known: string[], span = 1) {
   return `These images are screenshots a TikTok Shop affiliate creator took of her sales, from TikTok Shop's Creator Center, affiliate analytics, orders or product performance screens. Today is ${today}.
 
-Read every product you can see and how many units it sold and how much revenue (GMV, in dollars) it made for the period shown.
+Read every product you can see and how many units it sold and how much revenue (GMV, in dollars) it made for the period shown.${span > 1 ? `
+She says these screenshots cover the LAST ${span} DAYS. Read each product's totals for that whole period (not a single day). If a screenshot clearly shows a different date range, say so in note.` : ""}
 - Never guess. If units or revenue aren't visible for a product, use null.
 - Shorten long listing titles to a short, recognizable product name (about 2–6 words).
 - She already tracks these products. If a product matches one of them, use that exact name: ${known.length ? known.map((n) => JSON.stringify(n)).join(", ") : "(none yet)"}.

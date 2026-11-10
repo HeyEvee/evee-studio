@@ -50,7 +50,7 @@ export function mount(root, { supabase, email, billing = false }) {
   const S = {
     err: "", busy: null, q: "", aff: 0,
     tl: { fw: null, product: { name: "", price: "", audience: "" } }, tlCache: {},
-    products: [], sales: {}, log: null, // log = { date, rows } while editing
+    products: [], sales: {}, ranges: {}, log: null, // log = { date, rows } while editing
     vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["0d", "1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
     profile: { name: "" }, profileRaw: {},
   };
@@ -65,16 +65,17 @@ export function mount(root, { supabase, email, billing = false }) {
   async function load() {
     const { data, error } = await supabase.from("docs").select("id,data").limit(2000);
     if (error) { statusEl.textContent = "Offline"; statusEl.className = "pill warn"; ready = true; render(true); return; }
-    const sales = {};
+    const sales = {}, ranges = {};
     for (const row of data || []) {
       const v = row.data || {};
       if (row.id === "profile") { S.profileRaw = v; S.profile = { name: String(v.name || "") }; }
       else if (row.id === "products") S.products = arr(v.list);
       else if (row.id.startsWith("sales-")) sales[row.id.slice(6)] = v;
+      else if (row.id.startsWith("range-")) ranges[row.id] = v;
       else if (row.id === "tailored") S.tlCache = v.items && typeof v.items === "object" ? v.items : {};
       else if (row.id === "videos") S.vids = v.counts && typeof v.counts === "object" ? v.counts : {};
     }
-    S.sales = sales; ready = true;
+    S.sales = sales; S.ranges = ranges; ready = true;
     if (!S.busy && !document.activeElement?.matches("input,textarea,select")) render(true);
   }
   function rememberProduct(p) {
@@ -125,7 +126,7 @@ export function mount(root, { supabase, email, billing = false }) {
     const all = []; let date = null, notes = [];
     for (let i = 0; i < batches.length; i++) {
       const label = batches.length > 1 ? `Evee is reading your screenshots (${i + 1} of ${batches.length})` : `Evee is reading ${list.length} screenshot${list.length > 1 ? "s" : ""}`;
-      const part = await ask("read", label, { action: "read", images: batches[i], today: dayKey(), known: [...known, ...all.map((r) => r.name)] });
+      const part = await ask("read", label, { action: "read", images: batches[i], today: dayKey(), span: L.span || 1, known: [...known, ...all.map((r) => r.name)] });
       if (!part) { if (!all.length) return; break; }
       for (const r of arr(part.rows)) { const j = all.findIndex((x) => norm(x.name) === norm(r.name)); if (j < 0) all.push(r); else if (all[j].units == null && r.units != null) all[j] = r; }
       date = date || part.date; if (part.note) notes.push(part.note);
@@ -136,7 +137,7 @@ export function mount(root, { supabase, email, billing = false }) {
     const found = arr(out.rows).map((r) => ({ name: r.name, units: r.units ?? "", revenue: r.revenue ?? "", videos: (L.rows.find((x) => norm(x.name) === norm(r.name)) || {}).videos ?? "" }));
     const keep = typed.filter((r) => !found.some((f) => norm(f.name) === norm(r.name)));
     L.rows = [...found, ...keep];
-    if (out.date && out.date !== L.date && !S.sales[out.date]) L.date = out.date;
+    if ((L.span || 1) === 1 && out.date && out.date !== L.date && !S.sales[out.date]) L.date = out.date;
     L.read = { count: found.length, note: out.note || "" };
     render(true);
     const blanks = found.filter((r) => r.units === "").length;
@@ -159,6 +160,8 @@ export function mount(root, { supabase, email, billing = false }) {
     if (shots) shots.onchange = () => { const f = [...shots.files]; shots.value = ""; readScreenshots(f); };
     const hs = root.querySelector("#homeshots");
     if (hs) hs.onchange = () => { const f = [...hs.files]; hs.value = ""; if (!f.length) return; openLog(yesterday()); readScreenshots(f); };
+    const hs30 = root.querySelector("#homeshots30");
+    if (hs30) hs30.onchange = () => { const f = [...hs30.files]; hs30.value = ""; if (!f.length) return; openLog(yesterday(), 30); readScreenshots(f); };
   }
 
   /* ================= TODAY: best sellers + what to post ================= */
@@ -224,6 +227,24 @@ export function mount(root, { supabase, email, billing = false }) {
     }
     return out;
   }
+  // A 7- or 30-day screenshot stands in when daily logs don't cover most of that period (new users).
+  const rangeId = (n, end) => `range-${n}d-${end}`;
+  function snapshotFor(per) {
+    const n = per === "7d" ? 7 : per === "30d" ? 30 : 0; if (!n) return null;
+    const oldest = addDays(yesterday(), -6); let best = null;
+    for (const d of Object.values(S.ranges)) if (d.days === n && d.end >= oldest && d.end <= dayKey() && (!best || d.end > best.end)) best = d;
+    return best;
+  }
+  function statsFor(per, back = 0) {
+    const days = periodDays(per, back), snap = back === 0 ? snapshotFor(per) : null;
+    if (snap && days.filter((d) => S.sales[d]).length < Math.ceil(days.length * 0.8)) {
+      const out = {};
+      for (const r of arr(snap.rows)) { const k = norm(r.name); if (!k) continue; out[k] = { key: k, name: String(r.name).trim(), units: num(r.units) || 0, gmv: num(r.revenue), videos: num(r.videos) || 0 }; }
+      return { stats: out, snap };
+    }
+    return { stats: productStats(days), snap: null };
+  }
+  const snapLabel = (snap) => `Last ${snap.days} days to ${fmtDay(snap.end, { month: "short", day: "numeric" })} · from your screenshot`;
   const sumUp = (list) => ({ units: list.reduce((s, r) => s + r.units, 0), gmv: list.some((r) => r.gmv != null) ? list.reduce((s, r) => s + (r.gmv || 0), 0) : null, videos: list.reduce((s, r) => s + r.videos, 0) });
   const pct = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
   const delta = (p, label) => (p == null ? "" : `<span class="delta ${p > 0 ? "up" : p < 0 ? "down" : ""}">${p > 0 ? "▲" : p < 0 ? "▼" : ""} ${Math.abs(p)}%${label ? ` <span>${label}</span>` : ""}</span>`);
@@ -247,9 +268,9 @@ export function mount(root, { supabase, email, billing = false }) {
       <button class="btn plain small" data-log="${Y}">or type them in</button></div>`;
   function today() {
     const Y = yesterday(), per = curPeriod(), days = periodDays(per);
-    const cur = productStats(days), prev = productStats(periodDays(per, 1));
+    const C = statsFor(per), cur = C.stats, prev = C.snap ? {} : productStats(periodDays(per, 1));
     const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-    const hasAny = Object.keys(S.sales).length > 0;
+    const hasAny = Object.keys(S.sales).length > 0 || Object.keys(S.ranges).length > 0;
     const affText = AFFIRMATIONS[(affirmationIndex(dayKey()) + S.aff) % AFFIRMATIONS.length];
     const top = `<p class="date">${fmtDay(dayKey())}</p><h1>${greet}${S.profile.name ? `, ${esc(S.profile.name)}` : ""}.</h1>`;
     const affCard = `<div class="aff"><span class="label">${S.aff ? "Affirmation" : "Today’s affirmation"}</span><p>${esc(affText)}</p>
@@ -258,7 +279,10 @@ export function mount(root, { supabase, email, billing = false }) {
     if (ready && !hasAny) return `<div class="fade">${head}
       <section><div class="card logcta"><h2>Let’s see what’s selling</h2>
         <p class="note">In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales. Drop them here and Evee builds your planner: your top sellers, how many videos you made for each, and the GMV they brought in.</p>
-        ${dropBtn(Y)}</div></section>
+        ${dropBtn(Y)}
+        <div class="or30"><span>New to Evee Studio?</span>
+          <label class="btn ghost small filebtn"><input type="file" id="homeshots30" accept="image/*" multiple>Drop your last 30 days instead</label>
+          <span class="note">In Creator Center → Analytics, set the date range to <b>Last 30 days</b> and screenshot your products. Evee shows your top sellers right away.</span></div></div></section>
       <section class="example"><div class="sechead"><h2>Your top sellers</h2><span class="pill warn">Example</span></div>
         <div class="list">${[["Mini car vacuum", 1240, 41, 6, "streak"], ["Silk pillowcase", 860, 22, 3, ""], ["Shapewear bodysuit", 610, 14, 1, "new"]].map(([n, g, u, v, t], i) => `<div class="prow"><span class="rank">${i + 1}</span><span class="name">${n} ${t ? `<span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}<div class="meta">${v} video${v > 1 ? "s" : ""} · ${money(g / v)} GMV per video</div><span class="bar"><i style="width:${Math.round((g / 1240) * 100)}%"></i></span></span><span class="num">${money(g)}<small class="meta">GMV · ${u} sold</small></span></div>`).join("")}</div></section>
     </div>`;
@@ -285,7 +309,7 @@ export function mount(root, { supabase, email, billing = false }) {
       ${affCard}
       <section>${periodSeg()}
         <div class="card hero">
-          <div class="sechead"><span class="label">GMV · ${esc(rangeLabel(days))}</span>${delta(pct(T.gmv || 0, TP.gmv || 0))}</div>
+          <div class="sechead"><span class="label">GMV · ${esc(C.snap ? snapLabel(C.snap) : rangeLabel(days))}</span>${delta(pct(T.gmv || 0, TP.gmv || 0))}</div>
           <b class="big">${T.gmv != null ? money(T.gmv) : "—"}</b>
           <div class="kpis">
             <div><b>${T.units.toLocaleString()}</b><span>Units sold</span></div>
@@ -295,7 +319,7 @@ export function mount(root, { supabase, email, billing = false }) {
           ${!anyVids ? `<p class="note">Add how many videos you posted when you log sales, so Evee can show GMV per video.</p>` : ""}
         </div></section>
 
-      <section><div class="sechead"><h2>Top sellers</h2><small>${PERIODS[per][2]}</small></div>
+      <section><div class="sechead"><h2>Top sellers</h2><small>${C.snap ? "from your screenshot" : PERIODS[per][2]}</small></div>
         ${rows.length ? `<div class="list">${shown.map((r, i) => { const pr = prev[r.key], d = pr ? pct(val(r), val(pr)) : null, t = tags[r.key];
           return `<button class="prow" data-prod="${esc(r.key)}"><span class="rank">${i + 1}</span>
             <span class="name">${esc(r.name)}${t && t !== "steady" ? ` <span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}
@@ -303,7 +327,7 @@ export function mount(root, { supabase, email, billing = false }) {
               <span class="bar"><i style="width:${Math.max(3, Math.round((val(r) / max) * 100))}%"></i></span></span>
             <span class="num">${useG ? money(r.gmv) : r.units.toLocaleString()}<small class="meta">${useG ? `GMV · ${r.units.toLocaleString()} sold` : "sold"}</small></span></button>`; }).join("")}</div>
           ${rows.length > 5 ? `<button class="btn plain small" data-act="showall">${S.showAll ? "Show top 5" : `Show top ${Math.min(10, rows.length)}`}</button>` : ""}`
-        : `<div class="card empty">No sales logged ${per === "0d" || per === "1d" ? "for " + periodWord(per) : "in this period"} yet.<br><br><button class="btn" data-log="${Y}">Log yesterday’s sales</button></div>`}
+        : `<div class="card empty">No sales logged ${per === "0d" || per === "1d" ? "for " + periodWord(per) : "in this period"} yet.${per !== "30d" && snapshotFor("30d") ? `<br><br><button class="btn ghost" data-period="30d">See your last 30 days</button>` : per !== "7d" && snapshotFor("7d") ? `<br><br><button class="btn ghost" data-period="7d">See your last 7 days</button>` : ""}<br><br><button class="btn" data-log="${Y}">Log yesterday’s sales</button></div>`}
       </section>
 
       ${picks.length ? `<section><div class="sechead"><h2>Retarget today</h2><small>from your numbers</small></div>
@@ -312,15 +336,17 @@ export function mount(root, { supabase, email, billing = false }) {
 
 
       <section><div class="sechead"><h2>Sales log</h2><button class="btn plain small" data-log="${dayKey()}">Log another day</button></div>
-        <div class="list">${Object.keys(S.sales).sort().reverse().slice(0, 7).map((d) => { const rs = arr(S.sales[d].rows).filter((r) => r.name); const g = rs.some((r) => num(r.revenue) != null) ? rs.reduce((s, r) => s + (num(r.revenue) || 0), 0) : null; const v = Object.values(S.vids[d] || {}).reduce((s, n) => s + (num(n) || 0), 0);
+        <div class="list">${Object.entries(S.ranges).sort((a, b) => String(b[1].end).localeCompare(String(a[1].end))).slice(0, 2).map(([id, r]) => { const rs = arr(r.rows).filter((x) => x.name); const g = rs.some((x) => num(x.revenue) != null) ? rs.reduce((t, x) => t + (num(x.revenue) || 0), 0) : null;
+          return `<button class="row two" data-range="${esc(id)}"><span class="name">Last ${r.days} days<div class="meta">to ${fmtDay(r.end, { month: "short", day: "numeric" })} · ${rs.length} product${rs.length === 1 ? "" : "s"} · screenshot</div></span><span class="num">${g != null ? money(g) : rs.reduce((t, x) => t + (num(x.units) || 0), 0) + " sold"}</span></button>`; }).join("")}${Object.keys(S.sales).sort().reverse().slice(0, 7).map((d) => { const rs = arr(S.sales[d].rows).filter((r) => r.name); const g = rs.some((r) => num(r.revenue) != null) ? rs.reduce((s, r) => s + (num(r.revenue) || 0), 0) : null; const v = Object.values(S.vids[d] || {}).reduce((s, n) => s + (num(n) || 0), 0);
           return `<button class="row two" data-log="${d}"><span class="name">${fmtDay(d, { weekday: "short", month: "short", day: "numeric" })}<div class="meta">${rs.length} product${rs.length === 1 ? "" : "s"}${v ? ` · ${v} video${v === 1 ? "" : "s"}` : ""}</div></span><span class="num">${g != null ? money(g) : rs.reduce((s, r) => s + (num(r.units) || 0), 0) + " sold"}</span></button>`; }).join("")}</div></section>
     </div>`;
   }
 
   function productView(k) {
     const per = curPeriod(), days = periodDays(per), Y = yesterday();
-    const st = productStats(days)[k] || { key: k, name: nameFor(k), units: 0, gmv: null, videos: 0 };
-    const pv = productStats(periodDays(per, 1))[k];
+    const C = statsFor(per);
+    const st = C.stats[k] || { key: k, name: nameFor(k), units: 0, gmv: null, videos: 0 };
+    const pv = C.snap ? null : productStats(periodDays(per, 1))[k];
     const P = salesByProduct()[k] || { byDay: {}, rev: {} };
     const span = [...Array(per === "30d" ? 30 : 14)].map((_, i) => addDays(Y, -i)).reverse();
     const useG = span.some((d) => (P.rev[d] || 0) > 0), dv = (d) => (useG ? P.rev[d] || 0 : P.byDay[d] || 0);
@@ -330,7 +356,7 @@ export function mount(root, { supabase, email, billing = false }) {
       <h1>${esc(st.name)}</h1>
       <section>${periodSeg()}
         <div class="card hero">
-          <div class="sechead"><span class="label">GMV · ${esc(rangeLabel(days))}</span>${pv ? delta(pct(st.gmv || 0, pv.gmv || 0)) : ""}</div>
+          <div class="sechead"><span class="label">GMV · ${esc(C.snap ? snapLabel(C.snap) : rangeLabel(days))}</span>${pv ? delta(pct(st.gmv || 0, pv.gmv || 0)) : ""}</div>
           <b class="big">${st.gmv != null ? money(st.gmv) : "—"}</b>
           <div class="kpis">
             <div><b>${st.units.toLocaleString()}</b><span>Units sold</span></div>
@@ -338,6 +364,7 @@ export function mount(root, { supabase, email, billing = false }) {
             <div><b>${perVideo(st) != null ? money(perVideo(st)) : "—"}</b><span>GMV per video</span></div>
           </div></div></section>
       <section><div class="card"><div class="sechead"><span class="label">${useG ? "Daily GMV" : "Daily units"} · last ${span.length} days</span><small class="meta"><span class="vkey">●</span> video posted</small></div>
+        ${!span.some((d) => dv(d) > 0) ? `<p class="note">Your daily chart fills in as you log each day’s sales.</p>` : ""}
         <div class="chart" role="img" aria-label="Daily sales for the last ${span.length} days">${span.map((d) => `<span class="col" title="${fmtDay(d, { month: "short", day: "numeric" })}: ${useG ? money(P.rev[d] || 0) : (P.byDay[d] || 0) + " sold"}${vidsOn(d, k) ? `, ${vidsOn(d, k)} video(s)` : ""}"><i class="dot${vidsOn(d, k) ? " on" : ""}"></i><i class="b${dv(d) ? "" : " zero"}" style="height:${Math.max(3, Math.round((dv(d) / mx) * 100))}%"></i></span>`).join("")}</div>
         <div class="axis"><span>${fmtDay(span[0], { month: "short", day: "numeric" })}</span><span>${fmtDay(span[span.length - 1], { month: "short", day: "numeric" })}</span></div></div></section>
       <section><div class="card"><span class="label">Videos you posted</span>${stepper(dayKey(), "Today")}${stepper(Y, "Yesterday")}
@@ -349,10 +376,11 @@ export function mount(root, { supabase, email, billing = false }) {
     const L = S.log; if (!L) return today();
     const names = [...new Set([...S.products.map((p) => p.name), ...Object.values(salesByProduct()).map((p) => p.name)])].filter(Boolean);
     return `<div class="fade"><button class="back" data-act="back">← Back</button>
-      <h1>Log sales</h1><p class="date">${fmtDay(L.date)}</p>
+      <h1>${L.span > 1 ? `Log your last ${L.span} days` : "Log sales"}</h1><p class="date">${L.span > 1 ? `${fmtDay(addDays(L.date, -(L.span - 1)), { month: "short", day: "numeric" })} – ${fmtDay(L.date, { month: "short", day: "numeric" })}` : fmtDay(L.date)}</p>
+      ${L.origSpan ? "" : `<section><span class="label">This screenshot covers</span><div class="seg span">${[[1, "One day"], [7, "Last 7 days"], [30, "Last 30 days"]].map(([n, l]) => `<button aria-pressed="${L.span === n}" data-span="${n}">${l}</button>`).join("")}</div></section>`}
       <section>${busyIs("read") ? busyCard() : `<div class="card shots">
         <h2>Fill from screenshots</h2>
-        <p class="note">In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales (GMV and units). Add as many screenshots as you need.</p>
+        <p class="note">${L.span > 1 ? `In TikTok Shop, open Creator Center → Analytics, set the date range to <b>Last ${L.span} days</b>, and screenshot your product sales (GMV and units).` : "In TikTok Shop, open Creator Center → Analytics and screenshot yesterday’s product sales (GMV and units)."} Add as many screenshots as you need.</p>
         <label class="drop"><input type="file" id="shots" accept="image/*" multiple>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
           <b>Choose screenshots</b><span class="note">Evee fills in the products and numbers for you</span></label>
@@ -360,39 +388,54 @@ export function mount(root, { supabase, email, billing = false }) {
       </div>`}</section>
       <section><div class="card">
         <span class="label">${L.read ? "Check and edit" : "Or type them in"}</span>
-        <div class="field"><label for="ld">Day</label><input type="date" id="ld" data-bind="log.date" value="${esc(L.date)}" max="${dayKey()}"></div>
+        <div class="field"><label for="ld">${L.span > 1 ? "Last day included" : "Day"}</label><input type="date" id="ld" data-bind="log.date" value="${esc(L.date)}" max="${dayKey()}"></div>
         <datalist id="known">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
         ${L.rows.map((r, i) => `<div class="logrow">
           <div class="field"><label for="lr${i}n">Product</label><input type="text" id="lr${i}n" list="known" data-bind="log.rows.${i}.name" value="${esc(r.name)}" placeholder="Product name"></div>
           <div class="field"><label for="lr${i}u">Sold</label><input type="text" inputmode="numeric" id="lr${i}u" data-bind="log.rows.${i}.units" value="${esc(r.units)}" placeholder="—"${L.tried && num(r.units) == null && num(r.revenue) == null && String(r.name || "").trim() ? ' class="missing" aria-invalid="true"' : num(r.units) == null && String(r.name || "").trim() ? ' class="blank"' : ""}></div>
           <div class="field"><label for="lr${i}r">GMV $</label><input type="text" inputmode="decimal" id="lr${i}r" data-bind="log.rows.${i}.revenue" value="${esc(r.revenue)}" placeholder="—"${L.tried && num(r.units) == null && num(r.revenue) == null && String(r.name || "").trim() ? ' class="missing" aria-invalid="true"' : ""}></div>
-          <div class="field"><label for="lr${i}v">Videos posted</label><input type="text" inputmode="numeric" id="lr${i}v" data-bind="log.rows.${i}.videos" value="${esc(r.videos ?? "")}" placeholder="—"></div>
+          <div class="field"><label for="lr${i}v">${L.span > 1 ? "Videos (total)" : "Videos posted"}</label><input type="text" inputmode="numeric" id="lr${i}v" data-bind="log.rows.${i}.videos" value="${esc(r.videos ?? "")}" placeholder="—"></div>
           ${L.rows.length > 1 ? `<button class="x" data-rmrow="${i}" aria-label="Remove row">×</button>` : `<span></span>`}
         </div>`).join("")}
         <button class="btn ghost small" data-act="addrow">+ Add product</button>
-        <p class="note"><b>Videos posted</b> = how many new videos you posted for that product that day (leave it blank if none). Sales from your older videos still count in GMV.</p>
+        <p class="note">${L.span > 1 ? `<b>Videos (total)</b> = about how many videos you posted for that product in these ${L.span} days, if you know. Leave it blank if not. From now on, logging each day keeps your planner up to date.` : "<b>Videos posted</b> = how many new videos you posted for that product that day (leave it blank if none). Sales from your older videos still count in GMV."}</p>
         ${errBox()}
         <button class="btn" data-act="savelog">Save</button>
-        ${S.sales[L.orig] ? `<button class="btn plain" data-act="dellog">Delete this day</button>` : ""}
+        ${L.origSpan ? `<button class="btn plain" data-act="dellog">${L.origSpan > 1 ? "Delete this screenshot" : "Delete this day"}</button>` : ""}
       </div></section></div>`;
   }
-  function openLog(date) {
-    const doc = S.sales[date];
-    S.log = { date, orig: date, rows: doc ? clone(arr(doc.rows)).map((r) => ({ name: r.name || "", units: r.units ?? "", revenue: r.revenue ?? "", videos: S.vids[date]?.[norm(r.name)] ?? "" })) : [blankRow(), blankRow(), blankRow()] };
+  function openLog(date, span = 1) {
+    if (span > 1) {
+      const doc = S.ranges[rangeId(span, date)];
+      S.log = { date, orig: date, span, origSpan: doc ? span : 0, rows: doc ? clone(arr(doc.rows)).map((r) => ({ name: r.name || "", units: r.units ?? "", revenue: r.revenue ?? "", videos: r.videos ?? "" })) : [blankRow(), blankRow(), blankRow()] };
+    } else {
+      const doc = S.sales[date];
+      S.log = { date, orig: date, span: 1, origSpan: doc ? 1 : 0, rows: doc ? clone(arr(doc.rows)).map((r) => ({ name: r.name || "", units: r.units ?? "", revenue: r.revenue ?? "", videos: S.vids[date]?.[norm(r.name)] ?? "" })) : [blankRow(), blankRow(), blankRow()] };
+    }
     if (!S.log.rows.length) S.log.rows = [blankRow()];
     push("log");
   }
+
   async function saveLog() {
     const L = S.log;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(L.date)) { S.err = "Pick a day."; render(true); return; }
     const rows = L.rows.map((r) => ({ name: String(r.name || "").trim(), units: num(r.units), revenue: num(r.revenue) })).filter((r) => r.name);
     if (!rows.length) { S.err = "Add at least one product."; render(true); return; }
+    if (L.span > 1) for (const r of rows) { const src = L.rows.find((x) => String(x.name || "").trim() === r.name); r.videos = num(src?.videos); }
     const gap = rows.find((r) => r.units == null && r.revenue == null);
     if (gap) {
       L.tried = true; S.err = `Add how many sold or the GMV for ${gap.name} (0 is fine), or remove it with ×.`; render(true);
       const i = L.rows.findIndex((r) => String(r.name || "").trim() === gap.name);
       const el = root.querySelector(`#lr${i}u`); el?.scrollIntoView({ block: "center", behavior: "smooth" }); el?.focus({ preventScroll: true });
       return;
+    }
+    if (L.span > 1) {
+      const id = rangeId(L.span, L.date), doc = { kind: "range", days: L.span, end: L.date, rows, updatedAt: new Date().toISOString() };
+      if (L.origSpan > 1 && L.orig !== L.date) { const old = rangeId(L.origSpan, L.orig); delete S.ranges[old]; delDoc(old).catch(() => {}); }
+      S.ranges[id] = doc; persist(id, doc, "your sales");
+      for (const r of rows) if (!S.products.some((p) => norm(p.name) === norm(r.name))) rememberProduct({ name: r.name });
+      S.log = null; S.period = L.span === 7 ? "7d" : "30d"; try { localStorage.setItem("evee.period", S.period); } catch {}
+      go("today"); toast(`Saved your last ${L.span} days`); return;
     }
     const doc = { date: L.date, rows, updatedAt: new Date().toISOString() };
     if (L.orig !== L.date && S.sales[L.orig]) { delete S.sales[L.orig]; delDoc("sales-" + L.orig).catch(() => {}); }
@@ -435,7 +478,7 @@ export function mount(root, { supabase, email, billing = false }) {
   function tailorView() {
     const f = FW[S.tl.fw]; if (!f) return frameworks();
     const p = S.tl.product, res = S.tlCache[tlKey()];
-    const top = Object.values(productStats(periodDays("30d"))).filter((r) => r.units > 0 || (r.gmv || 0) > 0).sort((a, b) => (b.gmv || 0) - (a.gmv || 0) || b.units - a.units).map((r) => r.name);
+    const top = Object.values(statsFor("30d").stats).filter((r) => r.units > 0 || (r.gmv || 0) > 0).sort((a, b) => (b.gmv || 0) - (a.gmv || 0) || b.units - a.units).map((r) => r.name);
     const names = [...new Set([...top, ...S.products.map((x) => x.name)])].filter(Boolean).slice(0, 8);
     return `<div class="fade"><button class="back" data-act="back">← Frameworks</button>
       <p class="date">See it with my product</p><h1>${esc(f.name)}</h1>
@@ -480,13 +523,13 @@ export function mount(root, { supabase, email, billing = false }) {
 
   /* ================= PRODUCTS ================= */
   function productsTab() {
-    const per = curPeriod(), days = periodDays(per), cur = productStats(days), prev = productStats(periodDays(per, 1));
+    const per = curPeriod(), days = periodDays(per), C = statsFor(per), cur = C.stats, prev = C.snap ? {} : productStats(periodDays(per, 1));
     const rows = Object.values(cur).filter((r) => r.units > 0 || (r.gmv || 0) > 0 || r.videos > 0);
     const useG = rows.some((r) => (r.gmv || 0) > 0), val = (r) => (useG ? r.gmv || 0 : r.units);
     rows.sort((a, b) => val(b) - val(a) || b.units - a.units || b.videos - a.videos);
     const q = norm(S.q), list = q ? rows.filter((r) => norm(r.name).includes(q)) : rows;
     const tags = Object.fromEntries(recommendations().map((r) => [norm(r.name), r.tag]));
-    return `<div class="fade"><h1>Products</h1><p class="date">${rows.length} product${rows.length === 1 ? "" : "s"} · ${esc(rangeLabel(days))}</p>
+    return `<div class="fade"><h1>Products</h1><p class="date">${rows.length} product${rows.length === 1 ? "" : "s"} · ${esc(C.snap ? snapLabel(C.snap) : rangeLabel(days))}</p>
       <section>${periodSeg()}
         ${rows.length > 6 ? `<input type="search" id="pq" data-bind="q" data-live="1" value="${esc(S.q)}" placeholder="Search your products" aria-label="Search your products">` : ""}
         ${list.length ? `<div class="list">${list.map((r, i) => { const pr = prev[r.key], d = pr ? pct(val(r), val(pr)) : null, t = tags[r.key];
@@ -517,15 +560,17 @@ export function mount(root, { supabase, email, billing = false }) {
     if (e.target.dataset.live) { const id = e.target.id, pos = e.target.selectionStart; render(true); view.firstElementChild?.classList.remove("fade"); const el = root.querySelector("#" + id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch {} } } });
   on("click", (e) => {
     if (!root.contains(e.target)) return;
-    const el = e.target.closest("[data-go],[data-act],[data-log],[data-rmrow],[data-period],[data-prod],[data-vid],[data-copyfw],[data-tailor],[data-tlpick],[data-fwfor]");
+    const el = e.target.closest("[data-go],[data-act],[data-log],[data-rmrow],[data-period],[data-prod],[data-vid],[data-copyfw],[data-tailor],[data-tlpick],[data-fwfor],[data-span],[data-range]");
     if (!el) return; const d = el.dataset;
     if (d.go !== undefined) { if (d.go === "you") push("you"); else go(d.go); return; }
     if (d.log) { openLog(d.log); return; }
     if (d.rmrow !== undefined) { S.log.rows.splice(+d.rmrow, 1); render(true); return; }
     if (d.period) { setPeriod(d.period); return; }
+    if (d.span) { S.log.span = +d.span; if (+d.span > 1 && S.log.date > yesterday()) S.log.date = yesterday(); S.log.read = null; render(true); return; }
+    if (d.range) { const r = S.ranges[d.range]; if (r) openLog(r.end, r.days); return; }
     if (d.prod) { push("p:" + d.prod); return; }
     if (d.vid) { const [dt, by] = d.vid.split("|"), k = stack[stack.length - 1].slice(2); bumpVid(dt, nameFor(k), +by); render(true); return; }
-    if (d.tailor) { S.tl.fw = d.tailor; if (!S.tl.product.name) { const top = Object.values(productStats(periodDays("7d"))).sort((a, b) => (b.gmv || 0) - (a.gmv || 0) || b.units - a.units)[0]; if (top) setTlProduct(top.name); } push("tailor"); return; }
+    if (d.tailor) { S.tl.fw = d.tailor; if (!S.tl.product.name) { const top = Object.values(statsFor("7d").stats).sort((a, b) => (b.gmv || 0) - (a.gmv || 0) || b.units - a.units)[0]; if (top) setTlProduct(top.name); } push("tailor"); return; }
     if (d.tlpick) { setTlProduct(d.tlpick); render(true); return; }
     if (d.fwfor) { setTlProduct(d.fwfor); go("frameworks"); toast(`Open a framework and tap See it with ${d.fwfor}`); return; }
     if (d.copyfw) { const f = FRAMEWORKS.find((x) => x.id === d.copyfw); if (f) copy([f.name, f.oneLiner, "", "Best for: " + f.bestFor, "", ...f.steps.map((x, i) => `${i + 1}. ${x}`), "", "Tip: " + f.coach].join("\n")); return; }
@@ -540,7 +585,7 @@ export function mount(root, { supabase, email, billing = false }) {
       case "showall": S.showAll = !S.showAll; render(true); break;
       case "addrow": S.log.rows.push(blankRow()); render(true); root.querySelector(`#lr${S.log.rows.length - 1}n`)?.focus(); break;
       case "savelog": saveLog(); break;
-      case "dellog": { const dt = S.log.orig; delDoc("sales-" + dt).then(() => { delete S.sales[dt]; S.log = null; go("today"); toast("Deleted"); }, () => toast("Couldn’t delete. Check your connection.")); break; }
+      case "dellog": if (S.log.origSpan > 1) { const id = rangeId(S.log.origSpan, S.log.orig); delDoc(id).then(() => { delete S.ranges[id]; S.log = null; go("today"); toast("Deleted"); }, () => toast("Couldn’t delete. Check your connection.")); break; } { const dt = S.log.orig; delDoc("sales-" + dt).then(() => { delete S.sales[dt]; S.log = null; go("today"); toast("Deleted"); }, () => toast("Couldn’t delete. Check your connection.")); break; }
       case "saveprofile": S.profileRaw = { ...S.profileRaw, name: S.profile.name }; persist("profile", S.profileRaw, "your profile").then(() => toast("Saved")); break;
     }
   });
