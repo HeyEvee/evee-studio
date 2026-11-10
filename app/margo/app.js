@@ -2,6 +2,7 @@
 // Data: Supabase "docs" table (private per person). AI: /api/evee (prompts live on the server).
 import { FRAMEWORKS, FW } from "@/lib/library";
 import { AFFIRMATIONS, affirmationIndex } from "@/lib/affirmations";
+import { CHALLENGE_DAYS, CHALLENGE_GOALS } from "@/lib/challenge";
 import { SPINE, PRINCIPLES, PITFALLS } from "@/lib/playbook";
 
 export function mount(root, { supabase, email, billing = false }) {
@@ -49,6 +50,7 @@ export function mount(root, { supabase, email, billing = false }) {
   let userId = null, ready = false;
   const S = {
     err: "", busy: null, q: "", aff: 0,
+    ch: null, chDraft: null,
     tl: { fw: null, product: { name: "", price: "", audience: "" } }, tlCache: {},
     products: [], sales: {}, ranges: {}, log: null, // log = { date, rows } while editing
     vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["0d", "1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
@@ -73,6 +75,7 @@ export function mount(root, { supabase, email, billing = false }) {
       else if (row.id.startsWith("sales-")) sales[row.id.slice(6)] = v;
       else if (row.id.startsWith("range-")) ranges[row.id] = v;
       else if (row.id === "tailored") S.tlCache = v.items && typeof v.items === "object" ? v.items : {};
+      else if (row.id === "challenge") S.ch = v.startedAt ? v : null;
       else if (row.id === "videos") S.vids = v.counts && typeof v.counts === "object" ? v.counts : {};
     }
     S.sales = sales; S.ranges = ranges; ready = true;
@@ -152,7 +155,7 @@ export function mount(root, { supabase, email, billing = false }) {
   function back() { stack.pop(); if (!stack.length) stack = ["today"]; S.err = ""; render(); }
   function render(keep) {
     const y = window.scrollY, cur = stack[stack.length - 1];
-    view.innerHTML = cur.startsWith("p:") ? productView(cur.slice(2)) : cur === "log" ? logView() : ({ today, products: productsTab, frameworks, you, tailor: tailorView }[cur] || today)();
+    view.innerHTML = cur.startsWith("p:") ? productView(cur.slice(2)) : cur === "log" ? logView() : ({ today, products: productsTab, frameworks, you, tailor: tailorView, challenge: challengeView }[cur] || today)();
     const tabKey = ["today", "products", "frameworks"].includes(stack[0]) ? stack[0] : "";
     root.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.go === tabKey ? "page" : "false"));
     window.scrollTo(0, keep ? y : 0);
@@ -283,6 +286,7 @@ export function mount(root, { supabase, email, billing = false }) {
         <div class="or30"><span>New to Evee Studio?</span>
           <label class="btn ghost small filebtn"><input type="file" id="homeshots30" accept="image/*" multiple>Drop your last 30 days instead</label>
           <span class="note">In Creator Center → Analytics, set the date range to <b>Last 30 days</b> and screenshot your products. Evee shows your top sellers right away.</span></div></div></section>
+      <section>${homeChallengeCard()}</section>
       <section class="example"><div class="sechead"><h2>Your top sellers</h2><span class="pill warn">Example</span></div>
         <div class="list">${[["Mini car vacuum", 1240, 41, 6, "streak"], ["Silk pillowcase", 860, 22, 3, ""], ["Shapewear bodysuit", 610, 14, 1, "new"]].map(([n, g, u, v, t], i) => `<div class="prow"><span class="rank">${i + 1}</span><span class="name">${n} ${t ? `<span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}<div class="meta">${v} video${v > 1 ? "s" : ""} · ${money(g / v)} GMV per video</div><span class="bar"><i style="width:${Math.round((g / 1240) * 100)}%"></i></span></span><span class="num">${money(g)}<small class="meta">GMV · ${u} sold</small></span></div>`).join("")}</div></section>
     </div>`;
@@ -306,6 +310,7 @@ export function mount(root, { supabase, email, billing = false }) {
 
     return `<div class="fade">${top}
       ${!S.sales[Y] ? `<section class="first">${dropBtn(Y)}</section>` : `<button class="banner done" data-log="${Y}"><span><b>✓ Yesterday’s stats are in</b><span class="note">Tap to check or add more screenshots</span></span><span aria-hidden="true">→</span></button>`}
+      ${homeChallengeCard()}
       ${affCard}
       <section>${periodSeg()}
         <div class="card hero">
@@ -335,6 +340,7 @@ export function mount(root, { supabase, email, billing = false }) {
           <div class="btns"><button class="btn small" data-prod="${esc(p.r.key)}">See its numbers</button><button class="btn ghost small" data-fwfor="${esc(p.r.name)}">Pick a framework</button></div></div>`).join("")}</section>` : ""}
 
 
+      ${!S.ch && hasGmv() ? `<section><button class="btn plain small" data-go="challenge">Want more consistency? Start a 30-day posting challenge</button></section>` : ""}
       <section><div class="sechead"><h2>Sales log</h2><button class="btn plain small" data-log="${dayKey()}">Log another day</button></div>
         <div class="list">${Object.entries(S.ranges).sort((a, b) => String(b[1].end).localeCompare(String(a[1].end))).slice(0, 2).map(([id, r]) => { const rs = arr(r.rows).filter((x) => x.name); const g = rs.some((x) => num(x.revenue) != null) ? rs.reduce((t, x) => t + (num(x.revenue) || 0), 0) : null;
           return `<button class="row two" data-range="${esc(id)}"><span class="name">Last ${r.days} days<div class="meta">to ${fmtDay(r.end, { month: "short", day: "numeric" })} · ${rs.length} product${rs.length === 1 ? "" : "s"} · screenshot</div></span><span class="num">${g != null ? money(g) : rs.reduce((t, x) => t + (num(x.units) || 0), 0) + " sold"}</span></button>`; }).join("")}${Object.keys(S.sales).sort().reverse().slice(0, 7).map((d) => { const rs = arr(S.sales[d].rows).filter((r) => r.name); const g = rs.some((r) => num(r.revenue) != null) ? rs.reduce((s, r) => s + (num(r.revenue) || 0), 0) : null; const v = Object.values(S.vids[d] || {}).reduce((s, n) => s + (num(n) || 0), 0);
@@ -473,6 +479,92 @@ export function mount(root, { supabase, email, billing = false }) {
     </div>`;
   }
 
+  /* ================= 30-DAY FIRST SALE CHALLENGE ================= */
+  const daysBetween = (a, b) => Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000);
+  const postedOn = (d) => Object.values(S.vids[d] || {}).reduce((t, n) => t + (num(n) || 0), 0);
+  const chActive = () => S.ch && !S.ch.endedAt && daysBetween(S.ch.startedAt, dayKey()) < 30;
+  const chDayNum = () => Math.min(30, daysBetween(S.ch.startedAt, dayKey()) + 1);
+  const hasGmv = () => Object.values(S.sales).some((d) => arr(d.rows).some((r) => (num(r.units) || 0) > 0 || (num(r.revenue) || 0) > 0)) || Object.values(S.ranges).some((d) => arr(d.rows).some((r) => (num(r.units) || 0) > 0 || (num(r.revenue) || 0) > 0));
+  function chStreak() {
+    let n = 0, d = postedOn(dayKey()) >= S.ch.goal ? dayKey() : yesterday();
+    while (d >= S.ch.startedAt && postedOn(d) >= S.ch.goal) { n++; d = addDays(d, -1); }
+    return n;
+  }
+  function chSplit() { // spread today's goal across the 3 products, more for the most viewed
+    const ps = arr(S.ch.products), out = ps.map(() => 0);
+    for (let i = 0; i < S.ch.goal; i++) out[i % ps.length]++;
+    return out;
+  }
+  function saveCh() { persist("challenge", S.ch, "your challenge"); }
+  function homeChallengeCard() {
+    if (chActive()) {
+      const day = chDayNum(), done = postedOn(dayKey()), g = S.ch.goal;
+      return `<button class="chcard" data-go="challenge"><span class="label">30-Day Challenge · Day ${day}</span>
+        <b>${done >= g ? "Today’s goal is done ✓" : `${done} of ${g} videos posted today`}</b>
+        <span class="bar"><i style="width:${Math.min(100, Math.round((done / g) * 100))}%"></i></span>
+        <span class="note">${esc(CHALLENGE_DAYS[day - 1].title)} · tap for today’s plan</span></button>`;
+    }
+    if (S.ch && !hasGmv()) return `<button class="chcard" data-go="challenge"><span class="label">30-Day Challenge</span><b>See your results</b></button>`;
+    if (!hasGmv()) return `<div class="chpromo"><span class="label">No sales yet?</span><h2>Start the 30-Day First Sale Challenge</h2>
+        <p class="note">Post 3–5 videos a day on your 3 most-viewed products, with one lesson on converting better each day.</p>
+        <button class="btn" data-go="challenge">Start the challenge</button></div>`;
+    return "";
+  }
+  function challengeView() {
+    if (!S.ch || S.chDraft) return challengeSetup();
+    const ended = !chActive();
+    const day = chDayNum(), D = CHALLENGE_DAYS[day - 1], g = S.ch.goal, ps = arr(S.ch.products), split = chSplit();
+    const cells = [...Array(30)].map((_, i) => { const d = addDays(S.ch.startedAt, i), n = postedOn(d), past = d < dayKey(), isToday = d === dayKey();
+      const cls = d > dayKey() ? "future" : n >= g ? "met" : n > 0 ? "part" : past ? "miss" : "";
+      return `<span class="cell ${cls}${isToday && !ended ? " today" : ""}" title="Day ${i + 1}: ${n} video${n === 1 ? "" : "s"}">${i + 1}</span>`; });
+    const days = [...Array(Math.min(30, daysBetween(S.ch.startedAt, dayKey()) + 1))].map((_, i) => addDays(S.ch.startedAt, i));
+    const total = days.reduce((t, d) => t + postedOn(d), 0), met = days.filter((d) => postedOn(d) >= g).length;
+    const done = postedOn(dayKey());
+    return `<div class="fade"><button class="back" data-act="back">← Home</button>
+      <p class="date">30-Day First Sale Challenge</p><h1>${ended ? "Your 30 days" : `Day ${day} of 30`}</h1>
+      <section><div class="card">
+        <div class="chstats"><div><b>${total}</b><span>videos posted</span></div><div><b>${met}</b><span>days goal met</span></div><div><b>${ended ? "—" : chStreak()}</b><span>day streak</span></div></div>
+        <div class="grid30" role="img" aria-label="${met} of ${days.length} days goal met">${cells.join("")}</div>
+        <p class="note"><span class="lg met"></span> goal met <span class="lg part"></span> some posted <span class="lg miss"></span> missed</p>
+      </div></section>
+      ${S.ch.firstSaleAt ? `<section><div class="win"><b>🎉 First sale on ${fmtDay(S.ch.firstSaleAt, { month: "short", day: "numeric" })}!</b><p>That’s the hardest one. Log your sales each day now, and Evee’s planner will show you what to post more of.</p><button class="btn small" data-log="${S.ch.firstSaleAt}">Log that sale</button></div></section>` : ""}
+      ${ended ? `<section><div class="card"><h2>You did it.</h2><p class="note">${total} videos in 30 days. Whatever your numbers say, you know far more about what your audience responds to than you did on day 1.</p>
+        <button class="btn" data-act="chrestart">Start another 30 days</button></div></section>` : `
+      <section><div class="card chday"><span class="label">${esc(D.week)}</span><h2>Today: ${esc(D.title)}</h2><p>${esc(D.tip)}</p>
+        <button class="btn ghost small" data-chfw="${D.fw}">Try today’s framework: ${esc(FW[D.fw]?.name || "")}</button></div></section>
+      <section><div class="card"><div class="sechead"><h2>Post ${g} videos today</h2><b class="${done >= g ? "goodtxt" : ""}">${done}/${g}</b></div>
+        <span class="bar big"><i style="width:${Math.min(100, Math.round((done / g) * 100))}%"></i></span>
+        ${ps.map((p, i) => `<div class="vstep"><span>${esc(p.name)}<small class="meta">${split[i] ? `Suggested: ${split[i]} today` : "Optional today"}${p.views ? ` · ${esc(num(p.views) != null ? num(p.views).toLocaleString() : p.views)} views so far` : ""}</small></span><div><button class="x" data-chvid="${i}|-1" aria-label="One fewer video">−</button><b>${vidsOn(dayKey(), norm(p.name))}</b><button class="x" data-chvid="${i}|1" aria-label="One more video">+</button></div></div>`).join("")}
+        <p class="note">Tap + each time you post. Spread your videos across your products, with more on the one getting the most views.</p>
+        ${done >= g ? `<p class="readok">Goal done for today. That’s ${chStreak()} day${chStreak() === 1 ? "" : "s"} in a row. 💛</p>` : ""}
+      </div></section>
+      ${S.ch.firstSaleAt ? "" : `<section><button class="btn" data-act="chsale">🎉 I got my first sale!</button></section>`}
+      <section class="btns"><button class="btn plain small" data-act="chedit">Change products or goal</button><button class="btn plain small" data-act="chend">End challenge</button></section>`}
+    </div>`;
+  }
+  function challengeSetup() {
+    const D = S.chDraft ??= { goal: S.ch?.goal || 3, products: clone(S.ch?.products?.length ? S.ch.products : [{ name: "", views: "" }, { name: "", views: "" }, { name: "", views: "" }]) };
+    while (D.products.length < 3) D.products.push({ name: "", views: "" });
+    const names = [...new Set([...Object.values(statsFor("30d").stats).sort((a, b) => b.videos - a.videos).map((r) => r.name), ...S.products.map((x) => x.name)])].filter(Boolean).slice(0, 8);
+    return `<div class="fade"><button class="back" data-act="back">← Home</button>
+      <p class="date">30-Day First Sale Challenge</p><h1>${S.ch ? "Change your challenge" : "Let’s get your first sale"}</h1>
+      <p class="lede">For 30 days: post a few videos a day on your 3 best products, and learn one thing about converting each day. Consistency is how you find what works.</p>
+      <section><div class="card">
+        <span class="label">Videos a day</span>
+        <div class="seg">${CHALLENGE_GOALS.map((n) => `<button aria-pressed="${D.goal === n}" data-chgoal="${n}">${n} a day</button>`).join("")}</div>
+        <p class="note">TikTok Shop’s pilot program limits how many shoppable videos you can post, so stay within what your account allows.</p>
+      </div></section>
+      <section><div class="card">
+        <span class="label">Your 3 products</span>
+        <p class="note">Pick the 3 products whose videos have the most views so far. In TikTok, check Creator Center → Analytics. No views yet? Pick 3 products you’d genuinely recommend.</p>
+        ${names.length ? `<div class="chips">${names.map((n) => `<button class="opt" data-chpick="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : ""}
+        ${D.products.slice(0, 3).map((p, i) => `<div class="row2 chprod"><div class="field"><label for="cp${i}">Product ${i + 1}</label><input type="text" id="cp${i}" data-bind="chDraft.products.${i}.name" value="${esc(p.name)}" placeholder="${["Most views", "Second", "Third"][i]}"></div>
+          <div class="field"><label for="cv${i}">Views so far <span class="hint">optional</span></label><input type="text" inputmode="numeric" id="cv${i}" data-bind="chDraft.products.${i}.views" value="${esc(p.views || "")}" placeholder="—"></div></div>`).join("")}
+        ${errBox()}
+        <button class="btn" data-act="chstart">${S.ch && chActive() ? "Save changes" : "Start my 30 days"}</button>
+      </div></section></div>`;
+  }
+
   /* ================= SEE IT WITH MY PRODUCT ================= */
   const tlKey = () => { const p = S.tl.product; return ["v2", S.tl.fw, norm(p.name), String(p.price || "").trim(), norm(p.audience)].join("|"); };
   function tailorView() {
@@ -560,9 +652,13 @@ export function mount(root, { supabase, email, billing = false }) {
     if (e.target.dataset.live) { const id = e.target.id, pos = e.target.selectionStart; render(true); view.firstElementChild?.classList.remove("fade"); const el = root.querySelector("#" + id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch {} } } });
   on("click", (e) => {
     if (!root.contains(e.target)) return;
-    const el = e.target.closest("[data-go],[data-act],[data-log],[data-rmrow],[data-period],[data-prod],[data-vid],[data-copyfw],[data-tailor],[data-tlpick],[data-fwfor],[data-span],[data-range]");
+    const el = e.target.closest("[data-go],[data-act],[data-log],[data-rmrow],[data-period],[data-prod],[data-vid],[data-copyfw],[data-tailor],[data-tlpick],[data-fwfor],[data-span],[data-range],[data-chgoal],[data-chpick],[data-chvid],[data-chfw]");
     if (!el) return; const d = el.dataset;
-    if (d.go !== undefined) { if (d.go === "you") push("you"); else go(d.go); return; }
+    if (d.go !== undefined) { if (d.go === "challenge" && S.ch && chActive()) S.chDraft = null; if (d.go === "you" || d.go === "challenge") push(d.go); else go(d.go); return; }
+    if (d.chgoal) { S.chDraft.goal = +d.chgoal; render(true); return; }
+    if (d.chpick) { const ps = S.chDraft.products; if (!ps.some((p) => norm(p.name) === norm(d.chpick))) { const i = ps.findIndex((p) => !String(p.name || "").trim()); if (i >= 0) ps[i].name = d.chpick; else toast("Clear a product first to swap it."); } render(true); return; }
+    if (d.chvid) { const [i, by] = d.chvid.split("|"); const p = S.ch.products[+i]; if (p) { bumpVid(dayKey(), p.name, +by); render(true); if (postedOn(dayKey()) === S.ch.goal && +by > 0) toast("Goal done for today! 💛"); } return; }
+    if (d.chfw) { S.tl.fw = d.chfw; const p = S.ch?.products?.[0]; if (p) setTlProduct(p.name); push("tailor"); return; }
     if (d.log) { openLog(d.log); return; }
     if (d.rmrow !== undefined) { S.log.rows.splice(+d.rmrow, 1); render(true); return; }
     if (d.period) { setPeriod(d.period); return; }
@@ -582,6 +678,18 @@ export function mount(root, { supabase, email, billing = false }) {
       case "tailor": runTailor(); break;
       case "tlcopy": copy(tailorText()); break;
       case "tlclear": S.tl.product = { name: "", price: "", audience: "" }; render(true); break;
+      case "chstart": {
+        const D = S.chDraft, ps = D.products.map((p) => ({ name: String(p.name || "").trim(), views: String(p.views || "").trim() })).filter((p) => p.name);
+        if (!ps.length) { S.err = "Add at least one product."; render(true); break; }
+        const restart = !S.ch || !chActive();
+        S.ch = restart ? { startedAt: dayKey(), goal: D.goal, products: ps, firstSaleAt: null, endedAt: null } : { ...S.ch, goal: D.goal, products: ps };
+        for (const p of ps) if (!S.products.some((x) => norm(x.name) === norm(p.name))) rememberProduct({ name: p.name });
+        S.chDraft = null; saveCh(); render(true); toast(restart ? "Day 1. Let’s go! 💛" : "Saved"); break;
+      }
+      case "chedit": S.chDraft = { goal: S.ch.goal, products: clone(S.ch.products) }; S.err = ""; render(true); break;
+      case "chrestart": S.chDraft = { goal: S.ch.goal, products: clone(S.ch.products) }; render(true); break;
+      case "chend": S.ch = { ...S.ch, endedAt: dayKey() }; saveCh(); render(true); toast("Challenge ended. Your progress is saved."); break;
+      case "chsale": S.ch = { ...S.ch, firstSaleAt: dayKey() }; saveCh(); render(true); toast("🎉 Your first sale! So proud of you."); break;
       case "showall": S.showAll = !S.showAll; render(true); break;
       case "addrow": S.log.rows.push(blankRow()); render(true); root.querySelector(`#lr${S.log.rows.length - 1}n`)?.focus(); break;
       case "savelog": saveLog(); break;
