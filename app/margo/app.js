@@ -495,16 +495,17 @@ export function mount(root, { supabase, email, billing = false }) {
     for (let i = 0; i < S.ch.goal; i++) out[i % ps.length]++;
     return out;
   }
+  const chName = () => (S.ch?.kind === "posting" || (!S.ch && hasGmv()) ? "30-Day Posting Challenge" : "30-Day First Sale Challenge");
   function saveCh() { persist("challenge", S.ch, "your challenge"); }
   function homeChallengeCard() {
     if (chActive()) {
       const day = chDayNum(), done = postedOn(dayKey()), g = S.ch.goal;
-      return `<button class="chcard" data-go="challenge"><span class="label">30-Day Challenge · Day ${day}</span>
+      return `<button class="chcard" data-go="challenge"><span class="label">${S.ch.kind === "posting" ? "Posting" : "First Sale"} Challenge · Day ${day}</span>
         <b>${done >= g ? "Today’s goal is done ✓" : `${done} of ${g} videos posted today`}</b>
         <span class="bar"><i style="width:${Math.min(100, Math.round((done / g) * 100))}%"></i></span>
         <span class="note">${esc(CHALLENGE_DAYS[day - 1].title)} · tap for today’s plan</span></button>`;
     }
-    if (S.ch && !hasGmv()) return `<button class="chcard" data-go="challenge"><span class="label">30-Day Challenge</span><b>See your results</b></button>`;
+    if (S.ch) return `<button class="chcard" data-go="challenge"><span class="label">${chName()}</span><b>See your 30 days</b></button>`;
     if (!hasGmv()) return `<div class="chpromo"><span class="label">No sales yet?</span><h2>Start the 30-Day First Sale Challenge</h2>
         <p class="note">Post 3–5 videos a day on your 3 most-viewed products, with one lesson on converting better each day.</p>
         <button class="btn" data-go="challenge">Start the challenge</button></div>`;
@@ -521,7 +522,7 @@ export function mount(root, { supabase, email, billing = false }) {
     const total = days.reduce((t, d) => t + postedOn(d), 0), met = days.filter((d) => postedOn(d) >= g).length;
     const done = postedOn(dayKey());
     return `<div class="fade"><button class="back" data-act="back">← Home</button>
-      <p class="date">30-Day First Sale Challenge</p><h1>${ended ? "Your 30 days" : `Day ${day} of 30`}</h1>
+      <p class="date">${chName()}</p><h1>${ended ? "Your 30 days" : `Day ${day} of 30`}</h1>
       <section><div class="card">
         <div class="chstats"><div><b>${total}</b><span>videos posted</span></div><div><b>${met}</b><span>days goal met</span></div><div><b>${ended ? "—" : chStreak()}</b><span>day streak</span></div></div>
         <div class="grid30" role="img" aria-label="${met} of ${days.length} days goal met">${cells.join("")}</div>
@@ -538,7 +539,7 @@ export function mount(root, { supabase, email, billing = false }) {
         <p class="note">Tap + each time you post. Spread your videos across your products, with more on the one getting the most views.</p>
         ${done >= g ? `<p class="readok">Goal done for today. That’s ${chStreak()} day${chStreak() === 1 ? "" : "s"} in a row. 💛</p>` : ""}
       </div></section>
-      ${S.ch.firstSaleAt ? "" : `<section><button class="btn" data-act="chsale">🎉 I got my first sale!</button></section>`}
+      ${S.ch.firstSaleAt || S.ch.kind === "posting" ? "" : `<section><button class="btn" data-act="chsale">🎉 I got my first sale!</button></section>`}
       <section class="btns"><button class="btn plain small" data-act="chedit">Change products or goal</button><button class="btn plain small" data-act="chend">End challenge</button></section>`}
     </div>`;
   }
@@ -547,7 +548,7 @@ export function mount(root, { supabase, email, billing = false }) {
     while (D.products.length < 3) D.products.push({ name: "", views: "" });
     const names = [...new Set([...Object.values(statsFor("30d").stats).sort((a, b) => b.videos - a.videos).map((r) => r.name), ...S.products.map((x) => x.name)])].filter(Boolean).slice(0, 8);
     return `<div class="fade"><button class="back" data-act="back">← Home</button>
-      <p class="date">30-Day First Sale Challenge</p><h1>${S.ch ? "Change your challenge" : "Let’s get your first sale"}</h1>
+      <p class="date">${chName()}</p><h1>${S.ch ? "Change your challenge" : hasGmv() ? "Let’s build your consistency" : "Let’s get your first sale"}</h1>
       <p class="lede">For 30 days: post a few videos a day on your 3 best products, and learn one thing about converting each day. Consistency is how you find what works.</p>
       <section><div class="card">
         <span class="label">Videos a day</span>
@@ -682,7 +683,7 @@ export function mount(root, { supabase, email, billing = false }) {
         const D = S.chDraft, ps = D.products.map((p) => ({ name: String(p.name || "").trim(), views: String(p.views || "").trim() })).filter((p) => p.name);
         if (!ps.length) { S.err = "Add at least one product."; render(true); break; }
         const restart = !S.ch || !chActive();
-        S.ch = restart ? { startedAt: dayKey(), goal: D.goal, products: ps, firstSaleAt: null, endedAt: null } : { ...S.ch, goal: D.goal, products: ps };
+        S.ch = restart ? { startedAt: dayKey(), kind: hasGmv() ? "posting" : "first-sale", goal: D.goal, products: ps, firstSaleAt: null, endedAt: null } : { ...S.ch, goal: D.goal, products: ps };
         for (const p of ps) if (!S.products.some((x) => norm(x.name) === norm(p.name))) rememberProduct({ name: p.name });
         S.chDraft = null; saveCh(); render(true); toast(restart ? "Day 1. Let’s go! 💛" : "Saved"); break;
       }
