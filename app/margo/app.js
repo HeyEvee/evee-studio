@@ -5,7 +5,7 @@ import { AFFIRMATIONS, affirmationIndex } from "@/lib/affirmations";
 import { CHALLENGE_DAYS, CHALLENGE_GOALS } from "@/lib/challenge";
 import { SPINE, PRINCIPLES, PITFALLS } from "@/lib/playbook";
 
-export function mount(root, { supabase, email, billing = false }) {
+export function mount(root, { supabase, email, billing = false, featured = null, owner = false }) {
   const listeners = new AbortController();
   const on = (type, fn) => document.addEventListener(type, fn, { signal: listeners.signal });
 
@@ -50,7 +50,8 @@ export function mount(root, { supabase, email, billing = false }) {
   let userId = null, ready = false;
   const S = {
     err: "", busy: null, q: "", aff: 0,
-    ch: null, chDraft: null,
+    ch: null, chDraft: null, fdraft: null,
+    feat: featured && FW[featured.fw] ? featured : { fw: FRAMEWORKS[Math.floor(Date.now() / (7 * 86400000)) % FRAMEWORKS.length].id, note: "", week: "", custom: false, autoFw: "" },
     tl: { fw: null, product: { name: "", price: "", audience: "" } }, tlCache: {},
     products: [], sales: {}, ranges: {}, log: null, // log = { date, rows } while editing
     vids: {}, showAll: false, period: (() => { try { const v = localStorage.getItem("evee.period"); return ["0d", "1d", "7d", "30d"].includes(v) ? v : "7d"; } catch { return "7d"; } })(),
@@ -155,7 +156,7 @@ export function mount(root, { supabase, email, billing = false }) {
   function back() { stack.pop(); if (!stack.length) stack = ["today"]; S.err = ""; render(); }
   function render(keep) {
     const y = window.scrollY, cur = stack[stack.length - 1];
-    view.innerHTML = cur.startsWith("p:") ? productView(cur.slice(2)) : cur === "log" ? logView() : ({ today, products: productsTab, frameworks, you, tailor: tailorView, challenge: challengeView }[cur] || today)();
+    view.innerHTML = cur.startsWith("p:") ? productView(cur.slice(2)) : cur === "log" ? logView() : ({ today, products: productsTab, frameworks, you, tailor: tailorView, challenge: challengeView, featedit: featEdit }[cur] || today)();
     const tabKey = ["today", "products", "frameworks"].includes(stack[0]) ? stack[0] : "";
     root.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-current", t.dataset.go === tabKey ? "page" : "false"));
     window.scrollTo(0, keep ? y : 0);
@@ -287,6 +288,7 @@ export function mount(root, { supabase, email, billing = false }) {
           <label class="btn ghost small filebtn"><input type="file" id="homeshots30" accept="image/*" multiple>Drop your last 30 days instead</label>
           <span class="note">In Creator Center → Analytics, set the date range to <b>Last 30 days</b> and screenshot your products. Evee shows your top sellers right away.</span></div></div></section>
       <section>${homeChallengeCard()}</section>
+      <section>${featCard("home")}</section>
       <section class="example"><div class="sechead"><h2>Your top sellers</h2><span class="pill warn">Example</span></div>
         <div class="list">${[["Mini car vacuum", 1240, 41, 6, "streak"], ["Silk pillowcase", 860, 22, 3, ""], ["Shapewear bodysuit", 610, 14, 1, "new"]].map(([n, g, u, v, t], i) => `<div class="prow"><span class="rank">${i + 1}</span><span class="name">${n} ${t ? `<span class="chip ${TAG[t][1]}">${TAG[t][0]}</span>` : ""}<div class="meta">${v} video${v > 1 ? "s" : ""} · ${money(g / v)} GMV per video</div><span class="bar"><i style="width:${Math.round((g / 1240) * 100)}%"></i></span></span><span class="num">${money(g)}<small class="meta">GMV · ${u} sold</small></span></div>`).join("")}</div></section>
     </div>`;
@@ -340,6 +342,7 @@ export function mount(root, { supabase, email, billing = false }) {
           <div class="btns"><button class="btn small" data-prod="${esc(p.r.key)}">See its numbers</button><button class="btn ghost small" data-fwfor="${esc(p.r.name)}">Pick a framework</button></div></div>`).join("")}</section>` : ""}
 
 
+      <section>${featCard("home")}</section>
       ${!S.ch && hasGmv() ? `<section><button class="btn plain small" data-go="challenge">Want more consistency? Start a 30-day posting challenge</button></section>` : ""}
       <section><div class="sechead"><h2>Sales log</h2><button class="btn plain small" data-log="${dayKey()}">Log another day</button></div>
         <div class="list">${Object.entries(S.ranges).sort((a, b) => String(b[1].end).localeCompare(String(a[1].end))).slice(0, 2).map(([id, r]) => { const rs = arr(r.rows).filter((x) => x.name); const g = rs.some((x) => num(x.revenue) != null) ? rs.reduce((t, x) => t + (num(x.revenue) || 0), 0) : null;
@@ -463,13 +466,14 @@ export function mount(root, { supabase, email, billing = false }) {
   function frameworks() {
     return `<div class="fade"><h1>Viral frameworks</h1>
       <p class="lede">${FRAMEWORKS.length} proven video structures that sell on TikTok Shop. Study them, pick one for your next video, and switch formats when a product stalls.</p>
+      <section>${featCard("fw")}</section>
       <section><details class="card fw formula"><summary><span><b>The conversion formula</b><span class="note">Every video that sells follows Hook → Pain point → Solution → CTA</span></span></summary>
         ${SPINE.map((p, n) => `<div class="spine"><span class="part p-${p.id}">${n + 1}. ${esc(p.name)}</span><p><b>${esc(p.goal)}</b></p><ul class="ul">${p.how.map((h) => `<li>${esc(h)}</li>`).join("")}</ul></div>`).join("")}
         <div class="whybox"><span class="label">Persuasion principles that drive sales</span><ul class="ul">${PRINCIPLES.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
         <div class="whybox"><span class="label">What kills conversions</span><ul class="ul">${PITFALLS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
       </details></section>
       ${S.tl.product.name ? `<p class="forced">Showing frameworks for <b>${esc(S.tl.product.name)}</b> <button class="btn plain small" data-act="tlclear">Clear</button></p>` : ""}
-      <section>${FRAMEWORKS.map((f) => `<details class="card fw"><summary><span><b>${esc(f.name)}</b><span class="note">${esc(f.oneLiner)}</span></span></summary>
+      <section>${FRAMEWORKS.map((f) => `<details class="card fw" id="fw-${f.id}"${S.openFw === f.id ? " open" : ""}><summary><span><b>${esc(f.name)}</b><span class="note">${esc(f.oneLiner)}</span></span></summary>
         <p class="note"><b>Best for:</b> ${esc(f.bestFor)}</p>
         <ol class="ul">${f.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
         ${f.why ? `<div class="whybox"><span class="label">Why it works</span><ul class="ul">${f.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
@@ -477,6 +481,29 @@ export function mount(root, { supabase, email, billing = false }) {
         ${f.caution ? `<p class="flag note">${esc(f.caution)}</p>` : ""}
         <div class="btns"><button class="btn small" data-tailor="${f.id}">See it with ${S.tl.product.name ? esc(S.tl.product.name) : "my product"}</button><button class="btn ghost small" data-copyfw="${f.id}">Copy</button></div></details>`).join("")}</section>
     </div>`;
+  }
+
+  /* ================= FRAMEWORK OF THE WEEK ================= */
+  function featCard(where) {
+    const f = FW[S.feat.fw]; if (!f) return "";
+    return `<div class="feat${where === "fw" ? " pinned" : ""}"><span class="label">⭐ Framework of the week</span>
+      <h2>${esc(f.name)}</h2><p>${esc(f.oneLiner)}</p>
+      ${S.feat.note ? `<p class="fnote"><b>Why this week:</b> ${esc(S.feat.note)}</p>` : ""}
+      <div class="btns"><button class="btn small" data-tailor="${f.id}">See it with my product</button>${where === "fw" ? "" : `<button class="btn ghost small" data-act="openfeat">Study it</button>`}</div>
+      ${owner ? `<button class="btn plain small ownerbtn" data-go="featedit">✎ Change this week’s pick${S.feat.custom ? "" : " (automatic now)"}</button>` : ""}</div>`;
+  }
+  function featEdit() {
+    if (!owner) return today();
+    const D = S.fdraft ??= { fw: S.feat.fw, note: S.feat.custom ? S.feat.note : "" };
+    return `<div class="fade"><button class="back" data-act="back">← Back</button>
+      <p class="date">Only you see this</p><h1>Framework of the week</h1>
+      <p class="lede">Pick this week’s framework and add a note on why it’s working right now. Everyone sees it on Home and at the top of Frameworks until Monday, then it goes back to the automatic pick unless you choose again.</p>
+      <section><div class="card">
+        <div class="field"><label for="ff">Framework</label><select id="ff" data-bind="fdraft.fw">${FRAMEWORKS.map((f) => `<option value="${f.id}"${f.id === D.fw ? " selected" : ""}>${esc(f.name)}</option>`).join("")}</select></div>
+        <div class="field"><label for="fn">Why this week <span class="hint">optional, shown to everyone</span></label><textarea id="fn" rows="3" maxlength="280" data-bind="fdraft.note" placeholder="e.g. Split screens are getting huge reach in beauty right now.">${esc(D.note)}</textarea></div>
+        <button class="btn" data-act="savefeat">Save for this week</button>
+        ${S.feat.custom ? `<button class="btn plain" data-act="autofeat">Go back to the automatic pick</button>` : ""}
+      </div></section></div>`;
   }
 
   /* ================= 30-DAY FIRST SALE CHALLENGE ================= */
@@ -645,6 +672,7 @@ export function mount(root, { supabase, email, billing = false }) {
         <p class="note"><b>iPhone:</b> open it in Safari, tap Share, then Add to Home Screen.<br><b>Android:</b> open it in Chrome, tap ⋮, then Install app.</p></div></section>
       ${billing ? `<section><div class="card"><h2>Your subscription</h2><p class="note">Change your plan, update your card, see receipts or cancel. If you cancel, you keep access until the end of what you’ve paid for.</p><form method="post" action="/api/portal"><button class="btn ghost">Manage or cancel subscription</button></form></div></section>` : ""}
       <section><form method="post" action="/auth/signout" class="signout"><button class="btn plain">Sign out</button></form></section>
+      <p class="note center"><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:hello@heyevee.com">hello@heyevee.com</a></p>
     </div>`;
   }
 
@@ -655,7 +683,7 @@ export function mount(root, { supabase, email, billing = false }) {
     if (!root.contains(e.target)) return;
     const el = e.target.closest("[data-go],[data-act],[data-log],[data-rmrow],[data-period],[data-prod],[data-vid],[data-copyfw],[data-tailor],[data-tlpick],[data-fwfor],[data-span],[data-range],[data-chgoal],[data-chpick],[data-chvid],[data-chfw]");
     if (!el) return; const d = el.dataset;
-    if (d.go !== undefined) { if (d.go === "challenge" && S.ch && chActive()) S.chDraft = null; if (d.go === "you" || d.go === "challenge") push(d.go); else go(d.go); return; }
+    if (d.go !== undefined) { if (d.go === "challenge" && S.ch && chActive()) S.chDraft = null; if (d.go === "featedit") S.fdraft = null; if (d.go === "you" || d.go === "challenge" || d.go === "featedit") push(d.go); else go(d.go); return; }
     if (d.chgoal) { S.chDraft.goal = +d.chgoal; render(true); return; }
     if (d.chpick) { const ps = S.chDraft.products; if (!ps.some((p) => norm(p.name) === norm(d.chpick))) { const i = ps.findIndex((p) => !String(p.name || "").trim()); if (i >= 0) ps[i].name = d.chpick; else toast("Clear a product first to swap it."); } render(true); return; }
     if (d.chvid) { const [i, by] = d.chvid.split("|"); const p = S.ch.products[+i]; if (p) { bumpVid(dayKey(), p.name, +by); render(true); if (postedOn(dayKey()) === S.ch.goal && +by > 0) toast("Goal done for today! 💛"); } return; }
@@ -691,6 +719,10 @@ export function mount(root, { supabase, email, billing = false }) {
       case "chrestart": S.chDraft = { goal: S.ch.goal, products: clone(S.ch.products) }; render(true); break;
       case "chend": S.ch = { ...S.ch, endedAt: dayKey() }; saveCh(); render(true); toast("Challenge ended. Your progress is saved."); break;
       case "chsale": S.ch = { ...S.ch, firstSaleAt: dayKey() }; saveCh(); render(true); toast("🎉 Your first sale! So proud of you."); break;
+      case "openfeat": S.openFw = S.feat.fw; go("frameworks"); requestAnimationFrame(() => root.querySelector(`#fw-${S.feat.fw}`)?.scrollIntoView({ block: "start", behavior: "smooth" })); S.openFw = null; break;
+      case "savefeat": { const D = S.fdraft; S.feat = { ...S.feat, fw: D.fw, note: String(D.note || "").trim().slice(0, 280), custom: true };
+        persist("site-featured", { fw: S.feat.fw, note: S.feat.note, week: S.feat.week, updatedAt: new Date().toISOString() }, "this week’s pick").then(() => toast("Saved. Everyone sees it now.")); S.fdraft = null; back(); break; }
+      case "autofeat": delDoc("site-featured").then(() => { S.feat = { ...S.feat, fw: S.feat.autoFw || S.feat.fw, note: "", custom: false }; S.fdraft = null; back(); toast("Back to the automatic pick"); }, () => toast("Couldn’t change it. Check your connection.")); break;
       case "showall": S.showAll = !S.showAll; render(true); break;
       case "addrow": S.log.rows.push(blankRow()); render(true); root.querySelector(`#lr${S.log.rows.length - 1}n`)?.focus(); break;
       case "savelog": saveLog(); break;

@@ -49,6 +49,7 @@ export default function Pricing({ foundingLeft, notice, email }: { foundingLeft:
       </div>
       <ul className="lp-included">{INCLUDED.map((x) => <li key={x}>{x}</li>)}</ul>
       <p className="lp-fine">Secure checkout by Stripe. A card is needed to start the trial.</p>
+      <p className="lp-agree">Cancel anytime before your trial ends and you won’t be charged. Once your subscription is billed, payments are non-refundable, but you can cancel anytime and keep access until the end of the period you paid for. By starting a trial you agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</p>
     </section>
   );
 }

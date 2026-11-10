@@ -4,6 +4,7 @@ import Landing from "./landing/Landing";
 import Ended from "./landing/Ended";
 import { withTimeout } from "@/lib/timeout";
 import { ACTIVE, foundingLeft } from "@/lib/billing";
+import { getFeatured, isOwner } from "@/lib/featured";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
@@ -21,5 +22,5 @@ export default async function Home({ searchParams }: { searchParams: { checkout?
   const billing = (user.app_metadata as any)?.billing;
   // People invited by hand (beta testers) have no billing record and always get in.
   if (billing && !ACTIVE.has(billing.status)) return <Ended email={user.email ?? ""} foundingLeft={await foundingLeft()} notice={searchParams.checkout} />;
-  return <MargoMount email={user.email ?? ""} billing={!!billing?.customer} />;
+  return <MargoMount email={user.email ?? ""} billing={!!billing?.customer} featured={await getFeatured()} owner={isOwner(user.email)} />;
 }

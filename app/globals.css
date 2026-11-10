@@ -405,3 +405,12 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
 .win b{font-family:var(--display);font-size:18px}
 .win p{margin:0}
 .chprod{border-top:1px solid var(--line);padding-top:10px}
+/* Framework of the week */
+.feat{display:grid;gap:8px;padding:18px;border-radius:18px;background:linear-gradient(160deg,var(--surface),var(--accent-soft));border:1px solid var(--line)}
+.feat h2{margin:0}
+.feat p{margin:0;line-height:1.5}
+.feat .fnote{font-size:14px;padding:10px 12px;border-radius:12px;background:var(--surface)}
+.feat.pinned{border:2px solid var(--accent)}
+.ownerbtn{justify-self:start;margin-left:-8px}
+select{width:100%;min-height:46px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;padding:0 12px}
+.note.center{text-align:center}.note.center a{color:inherit}

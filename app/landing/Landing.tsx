@@ -13,7 +13,7 @@ const FAQ = [
   ["Which screenshots do I upload?", "In TikTok Shop, open Creator Center → Analytics and screenshot your product list for the day, showing units sold and GMV. You can add several screenshots at once."],
   ["How long does it take each day?", "About a minute. Tap “Drop yesterday’s stats”, pick your screenshots, check the numbers and save."],
   ["What does “founding member” mean?", "The first 50 subscribers pay $7 a month for as long as they stay subscribed, even after the regular price applies to everyone else."],
-  ["Can I cancel anytime?", "Yes. In the app, tap the profile icon (top right) → Manage or cancel subscription. If you cancel during your free trial, you won’t be charged."],
+  ["Can I cancel anytime?", "Yes. In the app, tap the profile icon (top right) → Manage or cancel subscription. If you cancel during your free trial, you won’t be charged. Once your subscription is billed, payments are non-refundable, and you keep access until the end of the period you paid for."],
   ["Is my data private?", "Yes. Your sales, products and notes are only visible to you."],
 ];
 
@@ -85,6 +85,7 @@ export default function Landing({ foundingLeft, notice }: { foundingLeft: number
 
       <footer className="lp-foot">
         <span>Evee Studio is part of the <a href="https://heyevee.com">Hey Evee</a> family.</span>
+        <span className="lp-links"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:hello@heyevee.com">Contact</a></span>
         <span>© {new Date().getFullYear()} Elevation Haus LLC</span>
       </footer>
     </div>

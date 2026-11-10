@@ -88,6 +88,7 @@ export default function Login() {
         </form>
       )}
       <p className="date" style={{ textAlign: "center" }}>New here? <a href="/#pricing" style={{ color: "var(--accent)", fontWeight: 600 }}>Start a 7-day free trial</a></p>
+      <p className="date" style={{ textAlign: "center", fontSize: 13 }}><a href="/terms" style={{ color: "inherit" }}>Terms</a> · <a href="/privacy" style={{ color: "inherit" }}>Privacy</a></p>
     </main>
   );
 }

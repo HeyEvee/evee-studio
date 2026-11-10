@@ -97,3 +97,15 @@
 .lp-nav .brand,.lp-signin,.lp-signup{white-space:nowrap}
 .lp-short{display:none}
 @media (max-width:370px){.lp-full{display:none}.lp-short{display:inline}.lp-nav nav{gap:6px;font-size:13px}}
+/* Terms / Privacy */
+.lp-legal{max-width:760px!important;padding-top:24px}
+.lp-legal h1{font-size:clamp(32px,5vw,44px)}
+.lp-legal h2{font-size:21px;margin:30px 0 8px}
+.lp-legal p,.lp-legal li{line-height:1.65;color:var(--ink)}
+.lp-legal p{margin:10px 0!important}
+.lp-legal ul{padding-left:20px;display:grid;gap:6px}
+.lp-legal a{color:var(--accent)}
+.lp-foot .lp-links{display:flex;gap:16px}
+.lp-agree{font-size:13px;color:var(--muted);margin-top:10px!important;max-width:60ch}
+.lp-agree a{color:var(--accent)}
+.lp-legal{width:min(760px,100%);margin-inline:auto;padding-inline:max(20px,env(safe-area-inset-left,0px));box-sizing:border-box}

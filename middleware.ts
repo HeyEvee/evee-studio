@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const path = request.nextUrl.pathname;
-  const isPublic = path === "/" || path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/welcome") || path.startsWith("/landing/") || path.startsWith("/api/checkout") || path.startsWith("/api/stripe/");
+  const isPublic = path === "/" || path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/welcome") || path.startsWith("/landing/") || path.startsWith("/api/checkout") || path.startsWith("/api/stripe/") || path === "/terms" || path === "/privacy";
   const toLogin = (down = false) => {
     if (path === "/" && !down) return response; // the landing page
     if (path.startsWith("/api/")) return NextResponse.json(down ? { code: "auth_down", message: "Evee can’t reach the sign-in service right now. Try again in a minute." } : { code: "unauthorized", message: "Sign in again." }, { status: down ? 503 : 401 });

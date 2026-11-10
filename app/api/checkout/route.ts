@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       line_items: [{ price: await priceFor(plan), quantity: 1 }],
       subscription_data: { trial_period_days: TRIAL_DAYS, metadata: { app: "evee-studio", plan } },
       allow_promotion_codes: true,
+      custom_text: { submit: { message: `Free for 7 days. Cancel anytime before then and you won’t be charged. After that, payments are non-refundable, but you can cancel anytime. Terms: ${origin}/terms` } },
       ...(email.includes("@") ? { customer_email: email } : {}),
       success_url: `${origin}/welcome?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/#pricing`,

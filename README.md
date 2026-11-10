@@ -5,11 +5,14 @@
 - **Home:** greets you with your top 5–10 best sellers for Yesterday, 7 days or 30 days: GMV, units, videos posted, GMV per video and the change vs the period before. "Retarget today" picks out the best return per video, sellers with no new videos, and products on a streak.
 - **Log sales:** for one day, or a whole **last 7 / last 30 days** screenshot (new users get a full planner on day one; the planner uses it until daily logs cover most of that period), from TikTok Shop screenshots (several at once; Evee reads them and you check) or by typing product, units, GMV and videos.
 - **30-Day First Sale Challenge** (`lib/challenge.ts`): for creators with no sales yet. Pick 3–5 videos a day (TikTok Shop pilot limits) and your 3 most-viewed products; each day has a lesson on converting, a framework to try, tap-to-count videos, a 30-day progress grid and "I got my first sale!". Free, no AI.
+- **Framework of the week** (`lib/featured.ts`): rotates automatically every Monday; the owner (`OWNER_EMAIL`) can pick it and add a note from Home or Frameworks. Needs `SUPABASE_SERVICE_ROLE_KEY`.
 - **Products:** every product ranked for the period, searchable. Tap one for its daily chart, video count and + / − for videos posted today or yesterday.
 - **Frameworks:** 25 proven viral video structures (including Rage Bait and Split Screen) plus the conversion formula (Hook → Pain point → Solution → CTA) to study and copy **See it with my product** walks one framework through beat by beat for a product (hook, what to show, an example line). Uses the cheaper fast model (`ANTHROPIC_FAST_MODEL`, default `claude-haiku-5-5`, falls back to the main model) and saves each walkthrough so reopening it is free.
 - **You:** name, sign out.
 
 **Landing page and subscriptions:** signed-out visitors see the landing page at `/` with pricing (Founding $7/mo for the first 50, $12/mo, $99/yr, all with a 7-day free trial). Checkout is Stripe; after paying, `/welcome` and the Stripe webhook create the account and store the subscription status on it. Canceled subscribers see a "subscription ended" screen; people invited by hand (beta testers) always get in. "Manage subscription" (You) opens Stripe's billing portal.
+
+**Legal:** `/terms` and `/privacy` (contact hello@heyevee.com). Payments are non-refundable once billed; cancel anytime.
 
 ### Stripe setup
 1. Vercel env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, then redeploy. Prices are created in Stripe automatically on first checkout (lookup keys `evee_studio_founding_monthly`, `evee_studio_monthly`, `evee_studio_yearly`).
