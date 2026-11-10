@@ -18,6 +18,8 @@ export async function POST(req: Request) {
   try {
     if (event.type === "checkout.session.completed") {
       const cs = event.data.object as Stripe.Checkout.Session;
+      // Same Stripe account as Hey Evee: only act on Evee Studio checkouts.
+      if (cs.metadata?.app !== "evee-studio") return NextResponse.json({ ok: true, skipped: "other product" });
       if (cs.mode === "subscription" && cs.subscription) {
         const sub = await s.subscriptions.retrieve(typeof cs.subscription === "string" ? cs.subscription : cs.subscription.id);
         const email = cs.customer_details?.email || cs.customer_email || (await emailForCustomer(sub.customer));
